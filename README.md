@@ -19,7 +19,7 @@ Nothing to carry over. Every component is built new, so none of it can conflict 
 ### What is missing (everything, by phase)
 
 | Phase | Component | Status |
-|---|---|---|
+| --- | --- | --- |
 | 2 | PostgreSQL schema and migrations (10 tables, money as BIGINT kobo), auth (JWT), accounts, double-entry ledger | Missing |
 | 3 | Payment state machine, Mock Bank A, gateway adapter, TSQ job | Missing |
 | 4 | Idempotency keys (Redis + DB), webhook HMAC, event-ID dedupe, dead-letter queue | Missing |
@@ -34,12 +34,30 @@ Nothing to carry over. Every component is built new, so none of it can conflict 
 ### Development environment found
 
 | Tool | Version | Note |
-|---|---|---|
+| --- | --- | --- |
 | Node.js | 24.4.1 | |
 | npm | 11.4.2 | |
-| PostgreSQL | 17 | `psql` installed locally |
+| PostgreSQL | 17 | `psql` installed locally; the project uses Postgres 16 in Docker instead |
 | Redis | not installed | Proposal: run it in Docker from Phase 4 |
 | Docker | 29.8 | Available for Redis, and later for running the stack |
+
+## Running locally
+
+```bash
+cp .env.example .env        # then fill in POSTGRES_PASSWORD, the two URLs and JWT_SECRET
+npm install
+npm run db:up               # Postgres 16 in Docker on port 5433 (creates transactflow + transactflow_test)
+npm run migrate             # applies src/db/migrations/*.sql
+npm test                    # resets transactflow_test and runs every test
+npm run dev                 # API on http://localhost:4000
+```
+
+## Progress
+
+| Phase | Status | Check |
+| --- | --- | --- |
+| 1. Audit | Done | Inventory committed |
+| 2. Foundation | Done | Wallet-to-wallet transfer writes balanced entries; 34 tests pass, including the debits-equal-credits invariant |
 
 ### Design note for Phase 10
 
