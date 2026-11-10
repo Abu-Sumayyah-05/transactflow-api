@@ -14,4 +14,12 @@ module.exports = async () => {
   await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   await runMigrations(client);
   await client.end();
+
+  // Empty the test Redis database (db 1), never the dev one.
+  const Redis = require('ioredis');
+  const redisUrl = process.env.TEST_REDIS_URL;
+  if (!redisUrl || !/\/1$/.test(redisUrl)) throw new Error('TEST_REDIS_URL must point at Redis db 1');
+  const redis = new Redis(redisUrl);
+  await redis.flushdb();
+  redis.disconnect();
 };

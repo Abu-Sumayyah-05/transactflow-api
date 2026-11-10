@@ -12,3 +12,7 @@ process.env.BCRYPT_ROUNDS = '4';
 // Short timeouts so timeout scenarios run in milliseconds, not seconds.
 process.env.GATEWAY_TIMEOUT_MS = '300';
 process.env.TSQ_INITIAL_DELAY_MS = '0';
+process.env.REDIS_URL = process.env.TEST_REDIS_URL;
+// Tests drive webhook processing explicitly with processDue(), and retry at once.
+process.env.WEBHOOK_INLINE_PROCESSING = 'false';
+process.env.WEBHOOK_RETRY_BASE_MS = '0';
