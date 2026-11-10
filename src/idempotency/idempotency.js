@@ -75,7 +75,8 @@ async function release({ key, scope }) {
 
 // Wraps a route. The handler gets (req, idem) and must call
 // idem.complete(client, status, body) inside its money transaction, then
-// return { status, body }.
+// return { status, body }. Handlers that call a bank first call
+// idem.sideEffectsStarted().
 function idempotent(routeName, handler) {
   return async (req, res) => {
     const key = req.get('Idempotency-Key');
@@ -91,11 +92,20 @@ function idempotent(routeName, handler) {
       return res.status(claimed.replay.status).json(claimed.replay.body);
     }
 
+    // Once a handler has sent something to a bank, a failure must NOT free the
+    // key: a retry could then charge twice. The key stays IN_PROGRESS and the
+    // payment is recovered by the TSQ job instead.
+    let sideEffects = false;
     let result;
     try {
-      result = await handler(req, { complete: (client, status, body) => complete(client, ref, status, body) });
+      result = await handler(req, {
+        complete: (client, status, body) => complete(client, ref, status, body),
+        sideEffectsStarted: () => {
+          sideEffects = true;
+        },
+      });
     } catch (err) {
-      await release(ref).catch(() => {});
+      if (!sideEffects) await release(ref).catch(() => {});
       throw err;
     }
     res.status(result.status).json(result.body);

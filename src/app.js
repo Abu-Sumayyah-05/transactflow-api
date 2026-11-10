@@ -4,6 +4,8 @@ const { AppError } = require('./errors');
 const auth = require('./auth/auth');
 const accounts = require('./accounts/accounts');
 const transfers = require('./transfers/transfers');
+const cards = require('./cards/cards');
+const payments = require('./payments/routes');
 
 const app = express();
 app.disable('x-powered-by');
@@ -15,6 +17,8 @@ const v1 = express.Router();
 v1.use('/auth', auth.router);
 v1.use('/accounts', auth.requireAuth, accounts.router);
 v1.use('/transfers', auth.requireAuth, transfers.router);
+v1.use('/cards', auth.requireAuth, cards.router);
+v1.use('/payments', auth.requireAuth, payments.router);
 app.use('/api/v1', v1);
 
 app.use((_req, _res, next) => next(new AppError(404, 'NOT_FOUND', 'Route not found')));
