@@ -6,9 +6,16 @@ const accounts = require('./accounts/accounts');
 const transfers = require('./transfers/transfers');
 const cards = require('./cards/cards');
 const payments = require('./payments/routes');
+const webhooks = require('./webhooks/routes');
+const admin = require('./admin/routes');
 
 const app = express();
 app.disable('x-powered-by');
+
+// Webhooks first: their HMAC is checked over the raw bytes, so they must be
+// mounted BEFORE the JSON parser consumes the body.
+app.use('/api/v1/webhooks', webhooks.router);
+
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
@@ -19,6 +26,7 @@ v1.use('/accounts', auth.requireAuth, accounts.router);
 v1.use('/transfers', auth.requireAuth, transfers.router);
 v1.use('/cards', auth.requireAuth, cards.router);
 v1.use('/payments', auth.requireAuth, payments.router);
+v1.use('/admin', auth.requireAuth, auth.requireRole('admin'), admin.router);
 app.use('/api/v1', v1);
 
 app.use((_req, _res, next) => next(new AppError(404, 'NOT_FOUND', 'Route not found')));

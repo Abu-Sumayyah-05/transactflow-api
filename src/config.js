@@ -28,4 +28,9 @@ module.exports = {
   // A payment left in PENDING this long (process crashed mid-call) is swept to UNKNOWN.
   pendingStaleMs: Number(process.env.PENDING_STALE_MS || 2 * 60 * 1000),
   defaultBank: process.env.DEFAULT_BANK || 'A',
+  // Webhooks: process right after receipt (tests turn this off and call
+  // processDue themselves); retry with backoff; DLQ after max attempts.
+  webhookInlineProcessing: process.env.WEBHOOK_INLINE_PROCESSING !== 'false',
+  webhookRetryBaseMs: Number(process.env.WEBHOOK_RETRY_BASE_MS ?? 2000),
+  webhookMaxAttempts: Number(process.env.WEBHOOK_MAX_ATTEMPTS || 5),
 };

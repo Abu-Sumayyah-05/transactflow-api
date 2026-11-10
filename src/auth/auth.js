@@ -87,4 +87,12 @@ function requireAuth(req, _res, next) {
   }
 }
 
-module.exports = { router, requireAuth };
+// Middleware: only lets through users whose token carries one of `roles`.
+function requireRole(...roles) {
+  return (req, _res, next) => {
+    if (!roles.includes(req.user?.role)) return next(new AppError(403, 'FORBIDDEN', 'You do not have access to this'));
+    next();
+  };
+}
+
+module.exports = { router, requireAuth, requireRole };
