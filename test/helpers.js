@@ -16,7 +16,7 @@ async function registerAndLogin(name = 'Test User') {
     .send({ email, password, full_name: name });
   if (reg.status !== 201) throw new Error(`register failed: ${JSON.stringify(reg.body)}`);
   const login = await request(app).post('/api/v1/auth/login').send({ email, password });
-  return { email, token: login.body.token, accountId: reg.body.account.id };
+  return { email, password, token: login.body.token, accountId: reg.body.account.id, userId: reg.body.user.id };
 }
 
 // Puts money into a wallet the same way the platform will: a balanced
@@ -47,4 +47,19 @@ async function balanceOf(accountId) {
   return rows[0].balance_kobo;
 }
 
-module.exports = { app, request, uniqueEmail, registerAndLogin, fundWallet, addCard, balanceOf, TEST_CARD };
+// Promotes a user to admin and logs in again so the JWT carries the new role.
+async function makeAdmin(user) {
+  await require('../src/db/pool').pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [user.userId]);
+  const login = await request(app).post('/api/v1/auth/login').send({ email: user.email, password: user.password });
+  return { ...user, token: login.body.token };
+}
+
+// Signs a webhook body the way a bank does: HMAC-SHA256 over the raw bytes.
+function signWebhook(rawBody, secret) {
+  return `sha256=${randomHmac(rawBody, secret)}`;
+}
+function randomHmac(rawBody, secret) {
+  return require('crypto').createHmac('sha256', secret).update(rawBody).digest('hex');
+}
+
+module.exports = { app, request, uniqueEmail, registerAndLogin, fundWallet, addCard, balanceOf, makeAdmin, signWebhook, TEST_CARD };

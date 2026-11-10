@@ -45,6 +45,7 @@ async function startCardTopup({ userId, cardToken, amountKobo }, idem) {
       bank,
       cardToken,
     });
+    await idem.linkPayment(client, p.id);
     await sm.transition(client, p.id, 'PENDING', { reason: 'sent to bank' });
     return p;
   });
@@ -101,6 +102,7 @@ async function startBankTransfer({ userId, bank, accountNumber, amountKobo }, id
       ],
     });
     await client.query('UPDATE payments SET hold_transaction_id = $2 WHERE id = $1', [p.id, holdId]);
+    await idem.linkPayment(client, p.id);
     await sm.transition(client, p.id, 'PENDING', { reason: 'funds held, sent to bank' });
     return p;
   });

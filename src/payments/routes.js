@@ -8,11 +8,22 @@ const tsq = require('./tsq');
 
 const router = express.Router();
 
+// How a retry of a payment-creating request is answered: with the payment as
+// it is right now. 202 while still in flight, 201 once final.
+async function livePaymentResponse(paymentId) {
+  const { rows } = await pool.query('SELECT * FROM payments WHERE id = $1', [paymentId]);
+  const body = repo.present(rows[0]);
+  return { status: ['COMPLETED', 'FAILED'].includes(body.status) ? 201 : 202, body };
+}
+
 // POST /payments — top up your wallet from a saved card token.
 router.post(
   '/',
-  idempotent('POST /payments', (req, idem) =>
-    service.startCardTopup({ userId: req.user.id, cardToken: req.body?.card_token, amountKobo: req.body?.amount_kobo }, idem)
+  idempotent(
+    'POST /payments',
+    (req, idem) =>
+      service.startCardTopup({ userId: req.user.id, cardToken: req.body?.card_token, amountKobo: req.body?.amount_kobo }, idem),
+    { livePaymentResponse }
   )
 );
 
@@ -28,4 +39,4 @@ router.get('/:id', async (req, res) => {
   res.json({ ...repo.present(p), events: await repo.events(pool, p.id) });
 });
 
-module.exports = { router };
+module.exports = { router, livePaymentResponse };

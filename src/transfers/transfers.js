@@ -50,6 +50,10 @@ router.post('/', idempotent('POST /transfers', async (req, idem) => {
       idem
     );
   }
+  return walletTransfer(req, idem);
+}, { livePaymentResponse: (id) => require('../payments/routes').livePaymentResponse(id) }));
+
+async function walletTransfer(req, idem) {
   const amountKobo = assertKobo(req.body?.amount_kobo);
 
   return withTransaction(async (client) => {
@@ -82,6 +86,6 @@ router.post('/', idempotent('POST /transfers', async (req, idem) => {
     await idem.complete(client, 201, body);
     return { status: 201, body };
   });
-}));
+}
 
 module.exports = { router };
