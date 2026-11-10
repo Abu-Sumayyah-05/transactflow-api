@@ -4,6 +4,7 @@ const { AppError } = require('../errors');
 const { assertKobo } = require('../money');
 const ledger = require('../ledger/ledger');
 const { idempotent } = require('../idempotency/idempotency');
+const payments = require('../payments/service');
 
 const router = express.Router();
 
@@ -17,17 +18,38 @@ async function findWalletByEmail(db, email) {
   return rows[0];
 }
 
-// GET /transfers/name-enquiry?email= — shows who the money will go to before
-// the customer confirms, so a typo doesn't send money to a stranger.
+// GET /transfers/name-enquiry — shows who the money will go to before the
+// customer confirms, so a typo doesn't send money to a stranger.
+//   ?email=...                       another TransactFlow wallet
+//   ?bank=A&account_number=...       an account at a bank (asks the bank)
 router.get('/name-enquiry', async (req, res) => {
+  if (req.query.bank) {
+    const bank = String(req.query.bank).toUpperCase();
+    const accountNumber = String(req.query.account_number || '');
+    const accountName = await payments.nameEnquiry(bank, accountNumber);
+    return res.json({ account_name: accountName, bank, account_number: accountNumber });
+  }
   const wallet = await findWalletByEmail(pool, req.query.email);
   if (!wallet) throw new AppError(404, 'RECIPIENT_NOT_FOUND', 'No TransactFlow wallet uses that email');
   res.json({ account_name: wallet.full_name, email: wallet.email });
 });
 
-// POST /transfers — wallet to wallet. Requires an Idempotency-Key, so a
-// double-tapped Send moves money once.
+// POST /transfers — requires an Idempotency-Key, so a double-tapped Send
+// moves money once.
+//   { recipient_email, amount_kobo }                 wallet to wallet
+//   { bank, account_number, amount_kobo }            to a bank account
 router.post('/', idempotent('POST /transfers', async (req, idem) => {
+  if (req.body?.bank !== undefined) {
+    return payments.startBankTransfer(
+      {
+        userId: req.user.id,
+        bank: String(req.body.bank).toUpperCase(),
+        accountNumber: String(req.body.account_number ?? ''),
+        amountKobo: req.body.amount_kobo,
+      },
+      idem
+    );
+  }
   const amountKobo = assertKobo(req.body?.amount_kobo);
 
   return withTransaction(async (client) => {
