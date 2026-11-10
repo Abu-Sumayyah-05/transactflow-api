@@ -1,10 +1,12 @@
 // Phase 2 check: a wallet-to-wallet transfer writes balanced ledger entries.
+const { randomUUID } = require('crypto');
 const { pool } = require('../src/db/pool');
 const { app, request, registerAndLogin, fundWallet } = require('./helpers');
 
 afterAll(() => pool.end());
 
-const auth = (u) => ({ Authorization: `Bearer ${u.token}` });
+// A fresh Idempotency-Key per request; GET routes simply ignore it.
+const auth = (u) => ({ Authorization: `Bearer ${u.token}`, 'Idempotency-Key': randomUUID() });
 
 async function balance(u) {
   const res = await request(app).get('/api/v1/accounts/me').set(auth(u));

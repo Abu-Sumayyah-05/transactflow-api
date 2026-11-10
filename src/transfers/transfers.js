@@ -3,6 +3,7 @@ const { pool, withTransaction } = require('../db/pool');
 const { AppError } = require('../errors');
 const { assertKobo } = require('../money');
 const ledger = require('../ledger/ledger');
+const { idempotent } = require('../idempotency/idempotency');
 
 const router = express.Router();
 
@@ -24,12 +25,12 @@ router.get('/name-enquiry', async (req, res) => {
   res.json({ account_name: wallet.full_name, email: wallet.email });
 });
 
-// POST /transfers — wallet to wallet. Idempotency-Key enforcement arrives in
-// Phase 4; bank-account transfers arrive with the gateway in Phase 3.
-router.post('/', async (req, res) => {
+// POST /transfers — wallet to wallet. Requires an Idempotency-Key, so a
+// double-tapped Send moves money once.
+router.post('/', idempotent('POST /transfers', async (req, idem) => {
   const amountKobo = assertKobo(req.body?.amount_kobo);
 
-  const result = await withTransaction(async (client) => {
+  return withTransaction(async (client) => {
     const sender = await client.query(
       "SELECT id FROM accounts WHERE user_id = $1 AND type = 'WALLET'",
       [req.user.id]
@@ -48,11 +49,17 @@ router.post('/', async (req, res) => {
         { accountId: recipient.account_id, direction: 'CREDIT', amountKobo },
       ],
     });
-    return { transaction_id: transactionId, recipient_name: recipient.full_name };
+    // COMPLETED is honest here: both ledger rows commit in our own database,
+    // in this same transaction as the saved idempotent response.
+    const body = {
+      transaction_id: transactionId,
+      recipient_name: recipient.full_name,
+      amount_kobo: amountKobo,
+      status: 'COMPLETED',
+    };
+    await idem.complete(client, 201, body);
+    return { status: 201, body };
   });
-
-  // COMPLETED is honest here: both ledger rows committed in our own database.
-  res.status(201).json({ ...result, amount_kobo: amountKobo, status: 'COMPLETED' });
-});
+}));
 
 module.exports = { router };
