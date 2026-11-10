@@ -32,7 +32,7 @@ router.post('/register', limiter, async (req, res) => {
   if (password.length < 10) throw new AppError(400, 'WEAK_PASSWORD', 'Password must be at least 10 characters');
   if (fullName.length < 2) throw new AppError(400, 'INVALID_NAME', 'Enter your full name');
 
-  const hash = await bcrypt.hash(password, 12);
+  const hash = await bcrypt.hash(password, config.bcryptRounds);
 
   // Role is never taken from the request: everyone signs up as a customer.
   const result = await withTransaction(async (client) => {
