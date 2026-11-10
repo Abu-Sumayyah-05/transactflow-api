@@ -34,4 +34,17 @@ async function fundWallet(accountId, amountKobo) {
   });
 }
 
-module.exports = { app, request, uniqueEmail, registerAndLogin, fundWallet };
+const TEST_CARD = { number: '4111 1111 1111 1111', exp_month: 12, exp_year: 2030, cvv: '123', holder_name: 'Test Payer' };
+
+async function addCard(user, card = TEST_CARD) {
+  const res = await request(app).post('/api/v1/cards').set('Authorization', `Bearer ${user.token}`).send(card);
+  if (res.status !== 201) throw new Error(`addCard failed: ${JSON.stringify(res.body)}`);
+  return res.body;
+}
+
+async function balanceOf(accountId) {
+  const { rows } = await require('../src/db/pool').pool.query('SELECT balance_kobo FROM accounts WHERE id = $1', [accountId]);
+  return rows[0].balance_kobo;
+}
+
+module.exports = { app, request, uniqueEmail, registerAndLogin, fundWallet, addCard, balanceOf, TEST_CARD };
