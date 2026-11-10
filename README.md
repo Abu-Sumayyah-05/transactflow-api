@@ -49,8 +49,11 @@ npm install
 npm run db:up               # Postgres 16 in Docker on port 5433 (creates transactflow + transactflow_test)
 npm run migrate             # applies src/db/migrations/*.sql
 npm test                    # resets transactflow_test and runs every test
+npm run bank:a              # Mock Bank A on http://localhost:5001 (separate terminal)
 npm run dev                 # API on http://localhost:4000
 ```
+
+Mock bank modes are switched live with `POST /_sim/mode` on the bank (header `x-sim-token: $SIM_TOKEN`), for example `{"mode":"timeout"}`, `{"mode":"error503","errorRate":0.5}` or `{"outcome":"DECLINED","declineCode":"51"}`. The admin console wraps this in Phase 10.
 
 ## Progress
 
@@ -58,6 +61,8 @@ npm run dev                 # API on http://localhost:4000
 | --- | --- | --- |
 | 1. Audit | Done | Inventory committed |
 | 2. Foundation | Done | Wallet-to-wallet transfer writes balanced entries; 34 tests pass, including the debits-equal-credits invariant |
+| 2b. Idempotency on transfers (owner request) | Done | Same key twice moves money once; different body returns 409 |
+| 3. Payment lifecycle (+ card vault, bank transfers) | Done | Timeout mode: payment goes UNKNOWN, then TSQ moves it to the bank's real status; 92 tests pass |
 
 ### Design note for Phase 10
 
