@@ -2,8 +2,8 @@
 // points the gateway at it.
 const { createBank } = require('../mockbank/bank');
 
-async function startBank(name = 'A') {
-  const bank = createBank({ name });
+async function startBank(name = 'A', { webhookUrl = null, webhookSecret = null } = {}) {
+  const bank = createBank({ name, webhookUrl, webhookSecret });
   const server = await new Promise((resolve) => {
     const s = bank.app.listen(0, '127.0.0.1', () => resolve(s));
   });
