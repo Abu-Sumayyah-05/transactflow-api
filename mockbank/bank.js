@@ -7,6 +7,9 @@
 //   error503  return 503 for errorRate (0..1) of calls, without processing
 //
 // `outcome` picks APPROVED or DECLINED (with declineCode) for new requests.
+// `outcome: 'DECLINE_CYCLE'` declines card charges with each code in
+// DECLINE_CYCLE in turn (51, 57, 61, 59, 54, 82, then round again), so the
+// decline classifier can be shown message by message.
 //
 // Webhooks (only when the bank is given a webhookUrl):
 //   webhook: 'normal'         one signed event per charge/transfer
@@ -28,6 +31,9 @@ const DEFAULT_MODE = Object.freeze({
   webhookCopies: 3,
 });
 
+// One code for each category the decline classifier must cover.
+const DECLINE_CYCLE = Object.freeze(['51', '57', '61', '59', '54', '82']);
+
 // Fake customer accounts for name enquiry and transfers.
 const ACCOUNTS = {
   '0123456789': 'Ngozi Eze',
@@ -43,10 +49,12 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     charges: new Map(),
     transfers: new Map(),
     calls: { charge: 0, transfer: 0 },
+    declineIndex: 0,
   };
 
   function setMode(patch) {
     state.mode = { ...DEFAULT_MODE, ...patch };
+    state.declineIndex = 0;
     return state.mode;
   }
   function reset() {
@@ -54,6 +62,7 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     state.charges.clear();
     state.transfers.clear();
     state.calls = { charge: 0, transfer: 0 };
+    state.declineIndex = 0;
   }
 
   const app = express();
@@ -142,12 +151,17 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
 
     state.calls.charge += 1;
     const approved = state.mode.outcome === 'APPROVED';
+    let declineCode = state.mode.declineCode;
+    if (state.mode.outcome === 'DECLINE_CYCLE') {
+      declineCode = DECLINE_CYCLE[state.declineIndex % DECLINE_CYCLE.length];
+      state.declineIndex += 1;
+    }
     const record = {
       reference,
       amount_kobo: amount,
       last4: String(pan).slice(-4), // the bank keeps the PAN to itself; we only echo last4
       status: approved ? 'APPROVED' : 'DECLINED',
-      response_code: approved ? '00' : state.mode.declineCode,
+      response_code: approved ? '00' : declineCode,
       bank_reference: bankRef(),
       at: new Date().toISOString(),
     };
@@ -199,7 +213,7 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     res.json(record);
   });
 
-  return { app, state, setMode, reset };
+  return { app, state, setMode, reset, DECLINE_CYCLE };
 }
 
-module.exports = { createBank, ACCOUNTS };
+module.exports = { createBank, ACCOUNTS, DECLINE_CYCLE };

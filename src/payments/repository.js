@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { formatNaira } = require('../money');
+const { classifyDecline, classifyTransferFailure } = require('./declines');
 
 // Our reference for the bank: unique, unguessable, safe to show on a receipt.
 function newReference() {
@@ -37,8 +38,12 @@ async function events(db, paymentId) {
   return rows;
 }
 
-// Placeholder wording until the Phase 6 decline classifier maps every code.
-// Even now, never a bare "declined".
+// What went wrong, in words the customer can act on (Module 1).
+function declineOf(p) {
+  if (p.status !== 'FAILED' || !p.response_code) return null;
+  return p.type === 'BANK_TRANSFER' ? classifyTransferFailure(p.response_code) : classifyDecline(p.response_code);
+}
+
 function customerMessage(p) {
   const isTransfer = p.type === 'BANK_TRANSFER';
   switch (p.status) {
@@ -54,9 +59,7 @@ function customerMessage(p) {
           ? 'The bank did not receive this transfer. Your money has been returned to your wallet.'
           : 'Your bank did not receive this payment, so you have not been charged.';
       }
-      return isTransfer
-        ? `The receiving bank rejected this transfer (code ${p.response_code}). Your money has been returned to your wallet.`
-        : `Your bank declined this payment (code ${p.response_code}). Try another card or contact your bank.`;
+      return declineOf(p).message;
     default:
       return 'Processing';
   }
@@ -72,6 +75,7 @@ function present(p) {
     amount_display: formatNaira(p.amount_kobo),
     bank: p.bank,
     response_code: p.response_code,
+    decline_reason: declineOf(p)?.category ?? null,
     message: customerMessage(p),
     ...(p.type === 'BANK_TRANSFER' && { account_number: p.destination_account, account_name: p.destination_name }),
     needs_review: p.needs_review,
