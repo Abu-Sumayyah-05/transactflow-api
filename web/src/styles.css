@@ -285,6 +285,28 @@ input[type='checkbox'] {
 .field + .field {
   margin-top: 12px;
 }
+/* Side by side in a grid, fields line up: the grid's gap does the spacing. */
+.grid > .field {
+  margin-top: 0;
+}
+/* Browser autofill paints inputs white or yellow. Keep them on-theme: the
+   inset shadow covers the browser's background, which can't be overridden
+   directly. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+select:-webkit-autofill,
+textarea:-webkit-autofill {
+  -webkit-text-fill-color: var(--bone);
+  -webkit-box-shadow: 0 0 0 1000px var(--indigo-3) inset;
+  box-shadow: 0 0 0 1000px var(--indigo-3) inset;
+  caret-color: var(--bone);
+  transition: background-color 9999s ease-out;
+}
+input:autofill {
+  -webkit-text-fill-color: var(--bone);
+  box-shadow: 0 0 0 1000px var(--indigo-3) inset;
+}
 /* The card form: visually a separate, sealed box (hosted-fields style). */
 .vault {
   border: 1px dashed var(--lilac);
