@@ -13,6 +13,7 @@
 const { pool, withTransaction } = require('../db/pool');
 const { AppError } = require('../errors');
 const ledger = require('../ledger/ledger');
+const outbox = require('../outbox/outbox');
 
 // Called by the webhook processor inside its transaction. Throws
 // PermanentError (passed in, to avoid a require cycle) for disputes that can
@@ -55,6 +56,14 @@ async function openFromWebhook(client, evt, PermanentError) {
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
     [p.id, evt.source, evt.event_id, data.reason ? String(data.reason).slice(0, 500) : null, amount, held, amount - held, holdTx]
   );
+  await outbox.add(client, 'dispute.opened', created[0].id, {
+    dispute_id: Number(created[0].id),
+    payment_id: p.id,
+    reference: p.reference,
+    amount_kobo: amount,
+    held_kobo: held,
+    shortfall_kobo: amount - held,
+  });
   return created[0];
 }
 
@@ -102,6 +111,13 @@ async function resolve({ disputeId, outcome, adminId }, idem) {
         WHERE id = $1 RETURNING *`,
       [d.id, outcome, txId, adminId]
     );
+    await outbox.add(client, 'dispute.resolved', d.id, {
+      dispute_id: Number(d.id),
+      payment_id: d.payment_id,
+      reference: d.reference,
+      outcome,
+      amount_kobo: held + shortfall,
+    });
     const body = present({ ...updated[0], payment_reference: d.reference });
     await idem.complete(client, 200, body);
     return { status: 200, body };

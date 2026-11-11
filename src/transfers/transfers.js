@@ -3,6 +3,7 @@ const { pool, withTransaction } = require('../db/pool');
 const { AppError } = require('../errors');
 const { assertKobo } = require('../money');
 const ledger = require('../ledger/ledger');
+const outbox = require('../outbox/outbox');
 const { idempotent } = require('../idempotency/idempotency');
 const payments = require('../payments/service');
 
@@ -46,6 +47,7 @@ router.post('/', idempotent('POST /transfers', async (req, idem) => {
         bank: String(req.body.bank).toUpperCase(),
         accountNumber: String(req.body.account_number ?? ''),
         amountKobo: req.body.amount_kobo,
+        startedAt: req.startedAt,
       },
       idem
     );
@@ -83,6 +85,12 @@ async function walletTransfer(req, idem) {
       amount_kobo: amountKobo,
       status: 'COMPLETED',
     };
+    await outbox.add(client, 'transfer.completed', transactionId, {
+      transaction_id: transactionId,
+      from_account_id: sender.rows[0].id,
+      to_account_id: recipient.account_id,
+      amount_kobo: amountKobo,
+    });
     await idem.complete(client, 201, body);
     return { status: 201, body };
   });

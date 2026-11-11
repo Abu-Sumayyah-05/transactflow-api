@@ -22,6 +22,7 @@ const crypto = require('crypto');
 const { pool, withTransaction } = require('../db/pool');
 const config = require('../config');
 const ledger = require('../ledger/ledger');
+const outbox = require('../outbox/outbox');
 const gateway = require('../gateway/gateway');
 const repo = require('../payments/repository');
 const sm = require('../payments/stateMachine');
@@ -123,13 +124,19 @@ async function createPayment(batch, item, resolvedName) {
 // Sends (or re-sends: same reference, so the bank dedupes) and records the answer.
 async function sendToBank(payment, hooks) {
   await hooks.beforeSend?.(payment);
+  const sentAt = Date.now();
   const result = await gateway.transfer(payment.bank, {
     reference: payment.reference,
     accountNumber: payment.destination_account,
     amountKobo: payment.amount_kobo,
   });
+  const bankMs = Date.now() - sentAt;
   await hooks.afterSend?.(payment);
-  await withTransaction((client) => applyOutcome(client, payment.id, result));
+  await withTransaction(async (client) => {
+    await applyOutcome(client, payment.id, result);
+    // Bank time only: a payout has no customer waiting on a request.
+    await client.query('UPDATE payments SET bank_ms = $2 WHERE id = $1', [payment.id, bankMs]);
+  });
 }
 
 async function processItem(batch, item, hooks) {
@@ -189,7 +196,19 @@ async function finish(batchId) {
     [batchId]
   );
   if (rows[0].queued || rows[0].unresolved) return 'WAITING';
-  await pool.query("UPDATE payout_batches SET status = 'DONE', completed_at = now() WHERE id = $1 AND status <> 'DONE'", [batchId]);
+  await withTransaction(async (client) => {
+    const done = await client.query(
+      "UPDATE payout_batches SET status = 'DONE', completed_at = now() WHERE id = $1 AND status <> 'DONE' RETURNING merchant_id, valid_rows",
+      [batchId]
+    );
+    if (done.rowCount) {
+      await outbox.add(client, 'payout_batch.completed', batchId, {
+        batch_id: batchId,
+        merchant_id: done.rows[0].merchant_id,
+        valid_rows: done.rows[0].valid_rows,
+      });
+    }
+  });
   return 'DONE';
 }
 

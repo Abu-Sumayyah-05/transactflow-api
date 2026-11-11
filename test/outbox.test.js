@@ -66,6 +66,24 @@ describe('writing events', () => {
     });
   });
 
+  test('a wallet-to-wallet transfer writes transfer.completed', async () => {
+    const { fundWallet } = require('./helpers');
+    const sender = await registerAndLogin('Sender');
+    const recipient = await registerAndLogin('Recipient');
+    await fundWallet(sender.accountId, 5000);
+    const res = await request(app)
+      .post('/api/v1/transfers')
+      .set('Authorization', `Bearer ${sender.token}`)
+      .set('Idempotency-Key', randomUUID())
+      .send({ recipient_email: recipient.email, amount_kobo: 1200 });
+    const rows = await rowsFor(res.body.transaction_id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      event_type: 'transfer.completed',
+      payload: { from_account_id: sender.accountId, to_account_id: recipient.accountId, amount_kobo: 1200 },
+    });
+  });
+
   test('same transaction: if the business change rolls back, so does its event', async () => {
     const p = await payment();
     const before = (await rowsFor(p.id)).length;
