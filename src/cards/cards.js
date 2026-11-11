@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { pool } = require('../db/pool');
 const { AppError } = require('../errors');
 const { encrypt, decrypt, fingerprint } = require('../security/crypto');
+const { cardCountryOf } = require('../fraud/rules');
 
 const router = express.Router();
 
@@ -60,11 +61,11 @@ router.post('/', async (req, res) => {
   const fp = fingerprint(pan);
   const token = `tok_${crypto.randomBytes(18).toString('base64url').replace(/[-_]/g, 'x')}`;
   const { rows } = await pool.query(
-    `INSERT INTO cards (token, user_id, pan_encrypted, fingerprint, brand, last4, exp_month, exp_year)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO cards (token, user_id, pan_encrypted, fingerprint, brand, last4, exp_month, exp_year, issuer_country)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (user_id, fingerprint) DO UPDATE SET exp_month = EXCLUDED.exp_month, exp_year = EXCLUDED.exp_year
      RETURNING token, brand, last4, exp_month, exp_year`,
-    [token, req.user.id, encrypt(pan), fp, brandOf(pan), pan.slice(-4), expMonth, expYear]
+    [token, req.user.id, encrypt(pan), fp, brandOf(pan), pan.slice(-4), expMonth, expYear, cardCountryOf(pan)]
   );
   res.status(201).json(publicCard(rows[0]));
 });
@@ -74,12 +75,18 @@ router.get('/', async (req, res) => {
   res.json({ cards: rows.map(publicCard) });
 });
 
+// The stored card row (no decryption): fingerprint and issuer country for
+// the fraud check.
+async function cardOf(db, userId, token) {
+  const { rows } = await db.query('SELECT * FROM cards WHERE token = $1 AND user_id = $2', [token, userId]);
+  if (!rows[0]) throw new AppError(404, 'CARD_NOT_FOUND', 'Card not found; add it again');
+  return rows[0];
+}
+
 // For the gateway only: the decrypted card, just long enough to send to the bank.
 async function cardForCharge(db, userId, token) {
-  const { rows } = await db.query('SELECT * FROM cards WHERE token = $1 AND user_id = $2', [token, userId]);
-  const card = rows[0];
-  if (!card) throw new AppError(404, 'CARD_NOT_FOUND', 'Card not found; add it again');
+  const card = await cardOf(db, userId, token);
   return { pan: decrypt(card.pan_encrypted), expMonth: card.exp_month, expYear: card.exp_year, last4: card.last4 };
 }
 
-module.exports = { router, luhnValid, cardForCharge };
+module.exports = { router, luhnValid, cardOf, cardForCharge };

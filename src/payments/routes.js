@@ -5,6 +5,7 @@ const { idempotent } = require('../idempotency/idempotency');
 const service = require('./service');
 const repo = require('./repository');
 const tsq = require('./tsq');
+const fraud = require('../fraud/check');
 
 const router = express.Router();
 
@@ -22,9 +23,30 @@ router.post(
   idempotent(
     'POST /payments',
     (req, idem) =>
-      service.startCardTopup({ userId: req.user.id, cardToken: req.body?.card_token, amountKobo: req.body?.amount_kobo }, idem),
+      service.startCardTopup(
+        {
+          userId: req.user.id,
+          cardToken: req.body?.card_token,
+          amountKobo: req.body?.amount_kobo,
+          billingAddress: req.body?.billing_address,
+          deviceId: fraud.parseDeviceId(req.get('X-Device-Id')),
+        },
+        idem
+      ),
     { livePaymentResponse }
   )
+);
+
+// POST /payments/:id/challenge { otp } — the 3DS-style step. It can trigger
+// the charge, so like every money-moving POST it needs an Idempotency-Key.
+// The payment id is part of the key's scope, so one key can't be replayed
+// against a different payment.
+router.post('/:id/challenge', (req, res) =>
+  idempotent(
+    `POST /payments/${req.params.id}/challenge`,
+    (r, idem) => service.completeChallenge({ userId: r.user.id, paymentId: r.params.id, otp: r.body?.otp }, idem),
+    { livePaymentResponse }
+  )(req, res)
 );
 
 // GET /payments/:id — status and receipt. If the status is UNKNOWN, ask the

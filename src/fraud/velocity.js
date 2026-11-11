@@ -12,10 +12,12 @@
 // disappears when it ends. Attempts that get blocked still count, so a
 // fraudster who keeps hammering stays blocked.
 //
-// If Redis is down we count the same thing from PostgreSQL (payments created
-// in the window), because the database stays the source of truth.
+// If Redis is down the same counters live in PostgreSQL (velocity_counters),
+// updated with one atomic upsert, so the fallback can't be raced either.
 const config = require('../config');
-const { redis } = require('../redis');
+const redisClient = require('../redis');
+
+const redis = () => redisClient.redis();
 
 const keyOf = (kind, id) => `vel:${kind}:${id}`;
 
@@ -42,25 +44,23 @@ async function countInRedis(ids, limits) {
   return counts;
 }
 
-// Fallback: the payments table already records every attempt. +1 for the
-// attempt being checked now, which has no row yet.
+// Fallback: the same fixed-window counter as one statement. ON CONFLICT
+// locks the row, so parallel attempts are counted one after another. An
+// expired window starts again at 1.
 async function countInDatabase(db, ids, limits) {
   const counts = {};
-  if (ids.user) {
+  for (const kind of Object.keys(ids)) {
     const { rows } = await db.query(
-      `SELECT COUNT(*)::int AS n FROM payments p JOIN accounts a ON a.id = p.account_id
-        WHERE a.user_id = $1 AND p.type = 'CARD_TOPUP' AND p.created_at > now() - make_interval(secs => $2)`,
-      [ids.user, limits.user.windowSeconds]
+      `INSERT INTO velocity_counters (key, count, expires_at)
+       VALUES ($1, 1, now() + make_interval(secs => $2))
+       ON CONFLICT (key) DO UPDATE SET
+         count = CASE WHEN velocity_counters.expires_at <= now() THEN 1 ELSE velocity_counters.count + 1 END,
+         expires_at = CASE WHEN velocity_counters.expires_at <= now() THEN EXCLUDED.expires_at
+                           ELSE velocity_counters.expires_at END
+       RETURNING count`,
+      [keyOf(kind, ids[kind]), limits[kind].windowSeconds]
     );
-    counts.user = rows[0].n + 1;
-  }
-  if (ids.card) {
-    const { rows } = await db.query(
-      `SELECT COUNT(*)::int AS n FROM payments p JOIN cards c ON c.token = p.card_token
-        WHERE c.fingerprint = $1 AND p.created_at > now() - make_interval(secs => $2)`,
-      [ids.card, limits.card.windowSeconds]
-    );
-    counts.card = rows[0].n + 1;
+    counts[kind] = rows[0].count;
   }
   return counts;
 }
@@ -78,6 +78,7 @@ async function hit({ userId, cardFingerprint }, limits = limitsFromConfig(), { d
   } catch (err) {
     if (!db) throw err;
     source = 'database';
+    console.warn(`velocity: Redis unavailable (${err.message}); counting in PostgreSQL`);
     counts = await countInDatabase(db, ids, limits);
   }
   const breaches = Object.keys(counts).filter((kind) => counts[kind] > limits[kind].limit);
@@ -85,11 +86,15 @@ async function hit({ userId, cardFingerprint }, limits = limitsFromConfig(), { d
 }
 
 // Admin marked a block as a false positive: let the customer try again.
-async function clear({ userId, cardFingerprint }) {
+async function clear({ userId, cardFingerprint }, { db = null } = {}) {
   const keys = [];
   if (userId) keys.push(keyOf('user', userId));
   if (cardFingerprint) keys.push(keyOf('card', cardFingerprint));
-  if (keys.length) await redis().del(...keys).catch(() => {});
+  if (!keys.length) return;
+  await Promise.resolve()
+    .then(() => redis().del(...keys))
+    .catch(() => {});
+  if (db) await db.query('DELETE FROM velocity_counters WHERE key = ANY($1)', [keys]);
 }
 
 module.exports = { hit, clear, limitsFromConfig };

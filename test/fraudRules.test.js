@@ -104,7 +104,10 @@ describe('signals', () => {
 
 describe('velocity counters (Redis INCR with a TTL)', () => {
   const limits = { user: { limit: 3, windowSeconds: 60 }, card: { limit: 3, windowSeconds: 600 } };
-  afterAll(() => require('../src/redis').close());
+  afterAll(async () => {
+    await require('../src/redis').close();
+    await require('../src/db/pool').pool.end();
+  });
 
   test('counts per user and per card, breaches above the limit, and expires with the window', async () => {
     const u = `u-${Date.now()}`;
@@ -118,6 +121,30 @@ describe('velocity counters (Redis INCR with a TTL)', () => {
     const ttl = await redis().ttl(`vel:user:${u}`);
     expect(ttl).toBeGreaterThan(0);
     expect(ttl).toBeLessThanOrEqual(60);
+  });
+
+  test('Redis down: the PostgreSQL fallback is just as atomic (8 parallel hits, limit 3 -> exactly 3 pass)', async () => {
+    const { pool } = require('../src/db/pool');
+    const redisModule = require('../src/redis');
+    const spy = jest.spyOn(redisModule, 'redis').mockReturnValue({
+      multi: () => {
+        throw new Error('connection refused');
+      },
+      del: async () => 0,
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const u = `u3-${Date.now()}`;
+      const results = await Promise.all(
+        Array.from({ length: 8 }, (_, i) => velocity.hit({ userId: u, cardFingerprint: `fp-${u}-${i}` }, limits, { db: pool }))
+      );
+      expect(results.every((r) => r.source === 'database')).toBe(true);
+      expect(results.map((r) => r.counts.user).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(results.filter((r) => !r.breached)).toHaveLength(3);
+    } finally {
+      spy.mockRestore();
+      warn.mockRestore();
+    }
   });
 
   test('clear() resets a user\'s counters (admin marks a block as a false positive)', async () => {

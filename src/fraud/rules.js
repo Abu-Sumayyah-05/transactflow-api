@@ -50,7 +50,7 @@ function bandOf(score) {
   return 'APPROVE';
 }
 
-function score({ email, billingCountry, cardCountry, deviceSeen, accountAgeDays, knownAddress, velocityBreached }) {
+function score({ email, billingCountry, cardCountry, deviceSeen, accountAgeDays, knownAddress, velocityBreached, velocityDetail }) {
   const fired = [];
   const fire = (rule, detail) => fired.push({ rule, points: RULES[rule], detail });
 
@@ -60,7 +60,7 @@ function score({ email, billingCountry, cardCountry, deviceSeen, accountAgeDays,
   if (!deviceSeen) fire('new_device', 'device not seen on an earlier completed payment');
   if (accountAgeDays > 365) fire('account_over_1_year', `account is ${Math.floor(accountAgeDays)} days old`);
   if (knownAddress) fire('known_address', 'billing address used before');
-  if (velocityBreached) fire('velocity', 'too many attempts in a short window (card testing)');
+  if (velocityBreached) fire('velocity', velocityDetail || 'too many attempts in a short window (card testing)');
 
   const total = fired.reduce((sum, r) => sum + r.points, 0);
   return { score: total, rulesFired: fired, outcome: bandOf(total) };

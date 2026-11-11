@@ -18,16 +18,19 @@ async function queryBank(p) {
 
 // A payment left in PENDING for too long means the process died between
 // "sent to bank" and "recorded the answer". Treat it as UNKNOWN so TSQ asks.
+// A payment waiting for its 3DS-style challenge was never sent, so it is
+// left alone here (expireChallenges handles it).
 async function sweepStalePending() {
   const { rows } = await pool.query(
-    `SELECT id FROM payments WHERE status = 'PENDING'
+    `SELECT id FROM payments WHERE status = 'PENDING' AND challenge_status IS DISTINCT FROM 'REQUIRED'
         AND updated_at < now() - make_interval(secs => $1::float8 / 1000) LIMIT $2`,
     [config.pendingStaleMs, BATCH]
   );
   for (const { id } of rows) {
     await withTransaction(async (client) => {
-      const { rows: cur } = await client.query('SELECT status FROM payments WHERE id = $1 FOR UPDATE', [id]);
+      const { rows: cur } = await client.query('SELECT status, challenge_status FROM payments WHERE id = $1 FOR UPDATE', [id]);
       if (cur[0].status !== 'PENDING') return; // the live request finished meanwhile
+      if (cur[0].challenge_status === 'REQUIRED') return;
       await sm.transition(client, id, 'UNKNOWN', { reason: 'stale PENDING (no answer recorded)' });
       await scheduleTsq(client, id, 0); // due immediately, by the database clock
     });
@@ -60,6 +63,7 @@ async function resolve(p) {
 const MAX_BATCHES_PER_TICK = 10;
 
 async function runOnce() {
+  await require('./service').expireChallenges();
   await sweepStalePending();
   let total = 0;
   for (let i = 0; i < MAX_BATCHES_PER_TICK; i += 1) {

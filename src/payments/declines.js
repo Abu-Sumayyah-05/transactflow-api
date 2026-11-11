@@ -80,6 +80,29 @@ const TRANSFER_FAILURES = Object.freeze({
   91: { category: 'ISSUER_UNAVAILABLE', message: 'The receiving bank is unavailable. Your money has been returned to your wallet; try again shortly.' },
 });
 
+// Failures decided by US, not by a bank (payments.failure_code). None of
+// these ever reached a bank, so the customer was never charged.
+const INTERNAL_FAILURES = Object.freeze({
+  FRAUD_BLOCKED: {
+    category: 'BLOCKED_BY_RISK',
+    message: 'We stopped this payment to protect your account. You have not been charged. If this was you, wait a few minutes and try again, or contact support.',
+  },
+  REVIEW_BLOCKED: {
+    category: 'BLOCKED_BY_RISK',
+    message: 'Our risk team cancelled this payment after review. You have not been charged. Contact support if you think this is a mistake.',
+  },
+  CHALLENGE_FAILED: {
+    category: 'CHALLENGE_FAILED',
+    message: 'The verification code was entered wrongly too many times, so this payment was cancelled. You have not been charged; you can start a new payment.',
+  },
+  CHALLENGE_EXPIRED: {
+    category: 'CHALLENGE_EXPIRED',
+    message: 'The verification step was not completed in time, so this payment was cancelled. You have not been charged; you can start a new payment.',
+  },
+});
+
+const classifyInternalFailure = (code) => ({ code, ...INTERNAL_FAILURES[code] });
+
 function classifyDecline(code) {
   const known = CARD_DECLINES[String(code)];
   if (known) return { code: String(code), ...known };
@@ -100,4 +123,4 @@ function classifyTransferFailure(code) {
   };
 }
 
-module.exports = { classifyDecline, classifyTransferFailure, CARD_DECLINES, TRANSFER_FAILURES };
+module.exports = { classifyDecline, classifyTransferFailure, classifyInternalFailure, CARD_DECLINES, TRANSFER_FAILURES, INTERNAL_FAILURES };

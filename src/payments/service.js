@@ -11,7 +11,8 @@ const { assertKobo } = require('../money');
 const config = require('../config');
 const ledger = require('../ledger/ledger');
 const gateway = require('../gateway/gateway');
-const { cardForCharge } = require('../cards/cards');
+const { cardOf, cardForCharge } = require('../cards/cards');
+const fraud = require('../fraud/check');
 const repo = require('./repository');
 const sm = require('./stateMachine');
 const { applyOutcome } = require('./outcomes');
@@ -32,34 +33,167 @@ async function finish(paymentId, result, idem) {
   });
 }
 
-async function startCardTopup({ userId, cardToken, amountKobo }, idem) {
-  assertKobo(amountKobo);
-  const card = await cardForCharge(pool, userId, String(cardToken || ''));
-  // Module 8 fallback: if Bank A's breaker is OPEN, route to Bank B. If both
-  // are down, say so now, before anything is created or charged.
+// Module 8 fallback: if Bank A's breaker is OPEN, route to Bank B. If both
+// are down, say so before anything is charged.
+function pickBankOrFail() {
   const bank = gateway.pickCardBank();
   if (!bank) {
     throw new AppError(503, 'BANKS_UNAVAILABLE', 'Card payments are temporarily unavailable. You have not been charged; please try again in a minute.');
   }
+  return bank;
+}
 
-  const payment = await withTransaction(async (client) => {
-    const p = await repo.create(client, {
-      accountId: await walletOf(client, userId),
-      type: 'CARD_TOPUP',
-      amountKobo,
-      bank,
-      cardToken,
-    });
-    await idem.linkPayment(client, p.id);
-    await sm.transition(client, p.id, 'PENDING', { reason: 'sent to bank' });
-    return p;
-  });
-
+// Sends a card payment that is PENDING with a bank chosen (and committed) to
+// that bank, then records the answer. Shared by the normal path, a passed
+// challenge and an admin approval.
+async function chargeAtBank(payment, ownerUserId, idem) {
   // From here the bank may have the request. If anything below crashes, the
   // key must stay claimed so a retry can't create a second charge.
   idem.sideEffectsStarted();
-  const result = await gateway.charge(bank, { reference: payment.reference, amountKobo, card });
+  const card = await cardForCharge(pool, ownerUserId, payment.card_token);
+  const result = await gateway.charge(payment.bank, { reference: payment.reference, amountKobo: payment.amount_kobo, card });
   return finish(payment.id, result, idem);
+}
+
+// POST /payments. Module 9 decides first, then the gateway (spec: "Runs fraud
+// check, then the gateway adapter").
+//   APPROVE    PENDING -> bank, exactly as before
+//   CHALLENGE  PENDING with a one-time code; no bank, no charge until it's passed
+//   BLOCK      FAILED at once; never sent to a bank; OPEN in the fraud queue
+async function startCardTopup({ userId, cardToken, amountKobo, billingAddress, deviceId }, idem) {
+  assertKobo(amountKobo);
+  const card = await cardOf(pool, userId, String(cardToken || ''));
+  const billing = fraud.parseBillingAddress(billingAddress);
+  const accountId = await walletOf(pool, userId);
+
+  const decision = await fraud.assess(pool, { userId, accountId, card, billing, deviceId });
+  // Only an approved payment goes to a bank now, so only it needs one now.
+  const bank = decision.outcome === 'APPROVE' ? pickBankOrFail() : null;
+
+  const created = await withTransaction(async (client) => {
+    const p = await repo.create(client, {
+      accountId,
+      type: 'CARD_TOPUP',
+      amountKobo,
+      bank,
+      cardToken: card.token,
+      billingCountry: billing?.country ?? null,
+      billingAddressHash: billing?.hash ?? null,
+      deviceId,
+    });
+    await fraud.record(client, p.id, decision);
+    await idem.linkPayment(client, p.id);
+    const reason = `fraud score ${decision.score}`;
+
+    if (decision.outcome === 'BLOCK') {
+      const final = await sm.transition(client, p.id, 'FAILED', { reason: `blocked: ${reason}`, set: { failure_code: 'FRAUD_BLOCKED' } });
+      const body = repo.present(final);
+      await idem.complete(client, 201, body);
+      return { done: { status: 201, body } };
+    }
+
+    if (decision.outcome === 'CHALLENGE') {
+      const otp = fraud.newOtp();
+      await sm.transition(client, p.id, 'PENDING', { reason: `challenge required: ${reason}`, set: { challenge_status: 'REQUIRED' } });
+      const { rows } = await client.query(
+        `UPDATE payments SET challenge_otp_hash = $2,
+                challenge_expires_at = now() + make_interval(secs => $3::float8 / 1000)
+          WHERE id = $1 RETURNING *`,
+        [p.id, fraud.hashOtp(p.id, otp), config.challengeTtlMs]
+      );
+      const body = repo.present(rows[0]);
+      // Demo/test only: a real issuer texts this code to the cardholder.
+      if (config.challengeRevealOtp) body.challenge.test_otp = otp;
+      await idem.complete(client, 202, body);
+      return { done: { status: 202, body } };
+    }
+
+    return { send: await sm.transition(client, p.id, 'PENDING', { reason: `sent to bank (${reason})` }) };
+  });
+
+  if (created.done) return created.done;
+  return chargeAtBank(created.send, userId, idem);
+}
+
+// Locks a card payment that is waiting for its challenge. Only valid from
+// PENDING (spec), and only if this payment asked for a challenge.
+async function lockChallenged(client, paymentId, userId = null) {
+  const { rows } = await client.query(
+    `SELECT p.*, a.user_id AS owner_id, now() >= p.challenge_expires_at AS challenge_expired
+       FROM payments p JOIN accounts a ON a.id = p.account_id
+      WHERE p.id = $1 ${userId ? 'AND a.user_id = $2' : ''} FOR UPDATE OF p`,
+    userId ? [paymentId, userId] : [paymentId]
+  );
+  const p = rows[0];
+  if (!p) throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Payment not found');
+  if (p.status !== 'PENDING' || p.challenge_status !== 'REQUIRED') {
+    throw new AppError(409, 'CHALLENGE_NOT_ALLOWED', `This payment is ${p.status} and is not waiting for a verification code`);
+  }
+  return p;
+}
+
+// Ends a challenge without charging anything.
+async function failChallenge(client, p, failureCode, challengeStatus, reason) {
+  return sm.transition(client, p.id, 'FAILED', { reason, set: { failure_code: failureCode, challenge_status: challengeStatus } });
+}
+
+// POST /payments/:id/challenge { otp }
+async function completeChallenge({ userId, paymentId, otp }, idem) {
+  if (!/^[0-9a-f-]{36}$/i.test(String(paymentId))) throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Payment not found');
+  const step = await withTransaction(async (client) => {
+    const p = await lockChallenged(client, paymentId, userId);
+    const respond = async (status, body) => {
+      await idem.complete(client, status, body);
+      return { done: { status, body } };
+    };
+
+    if (p.challenge_expired) {
+      return respond(201, repo.present(await failChallenge(client, p, 'CHALLENGE_EXPIRED', 'EXPIRED', 'challenge expired')));
+    }
+
+    if (!fraud.otpMatches(p.id, otp, p.challenge_otp_hash)) {
+      const attempts = p.challenge_attempts + 1;
+      await client.query('UPDATE payments SET challenge_attempts = $2, updated_at = now() WHERE id = $1', [p.id, attempts]);
+      if (attempts >= config.challengeMaxAttempts) {
+        return respond(201, repo.present(await failChallenge(client, p, 'CHALLENGE_FAILED', 'FAILED', 'wrong code too many times')));
+      }
+      // Returned, not thrown: the attempt count must commit.
+      const left = config.challengeMaxAttempts - attempts;
+      return respond(422, {
+        error: { code: 'INVALID_OTP', message: `That code is not right. ${left} ${left === 1 ? 'try' : 'tries'} left.`, attempts_left: left },
+      });
+    }
+
+    // Right code. Pick the bank now (throws 503, rolls back, and leaves the
+    // challenge open to retry if both banks are down).
+    const bank = pickBankOrFail();
+    await client.query('UPDATE payments SET bank = $2, challenge_status = $3, updated_at = now() WHERE id = $1', [p.id, bank, 'PASSED']);
+    await client.query(
+      "UPDATE fraud_decisions SET review_status = 'CLEARED_BY_CHALLENGE' WHERE payment_id = $1 AND review_status = 'OPEN'",
+      [p.id]
+    );
+    await idem.linkPayment(client, p.id);
+    return { send: { ...p, bank } };
+  });
+
+  if (step.done) return step.done;
+  return chargeAtBank(step.send, step.send.owner_id, idem);
+}
+
+// Background job: challenges nobody finished in time are cancelled.
+async function expireChallenges(limit = 50) {
+  const { rows } = await pool.query(
+    `SELECT id FROM payments WHERE status = 'PENDING' AND challenge_status = 'REQUIRED'
+        AND challenge_expires_at <= now() LIMIT $1`,
+    [limit]
+  );
+  for (const { id } of rows) {
+    await withTransaction(async (client) => {
+      const p = await lockChallenged(client, id).catch(() => null);
+      if (p) await failChallenge(client, p, 'CHALLENGE_EXPIRED', 'EXPIRED', 'challenge expired');
+    });
+  }
+  return rows.length;
 }
 
 const NUBAN = /^\d{10}$/;
@@ -117,4 +251,14 @@ async function startBankTransfer({ userId, bank, accountNumber, amountKobo }, id
   return finish(payment.id, result, idem);
 }
 
-module.exports = { startCardTopup, startBankTransfer, nameEnquiry };
+module.exports = {
+  startCardTopup,
+  completeChallenge,
+  expireChallenges,
+  lockChallenged,
+  failChallenge,
+  pickBankOrFail,
+  chargeAtBank,
+  startBankTransfer,
+  nameEnquiry,
+};

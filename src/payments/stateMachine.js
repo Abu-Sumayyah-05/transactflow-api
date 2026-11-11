@@ -27,7 +27,7 @@ function canTransition(from, to) {
 // Columns a transition may also set in the same UPDATE.
 const SETTABLE = new Set([
   'response_code', 'bank_reference', 'ledger_transaction_id', 'tsq_next_at',
-  'tsq_expires_at', 'needs_review',
+  'tsq_expires_at', 'needs_review', 'bank', 'failure_code', 'challenge_status',
 ]);
 
 // Moves a payment to `to`, inside the caller's transaction. Locks the row so

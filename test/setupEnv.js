@@ -19,3 +19,10 @@ process.env.WEBHOOK_RETRY_BASE_MS = '0';
 // Gateway retries: same policy, tiny waits.
 process.env.RETRY_BASE_MS = '5';
 process.env.RETRY_CAP_MS = '20';
+// Fraud: show the challenge code in the response so tests can complete it,
+// and lift the velocity limits so ordinary tests (many payments by one user,
+// one shared test card) aren't treated as card testing. Fraud tests lower
+// them on purpose.
+process.env.CHALLENGE_REVEAL_OTP = 'true';
+process.env.VELOCITY_USER_LIMIT = '1000';
+process.env.VELOCITY_CARD_LIMIT = '1000';
