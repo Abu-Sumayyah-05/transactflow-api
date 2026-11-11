@@ -38,8 +38,8 @@ async function openFromWebhook(client, evt, PermanentError) {
 
   // Lock the wallet and freeze as much of the amount as it still holds. The
   // wallet can never go negative; the rest is recorded as the shortfall.
-  const { rows: wallet } = await client.query('SELECT balance_kobo FROM accounts WHERE id = $1 FOR UPDATE', [p.account_id]);
-  const held = Math.min(amount, Number(wallet[0].balance_kobo));
+  const locked = await ledger.lockAccounts(client, [p.account_id, 'ESCROW']);
+  const held = Math.min(amount, Number(locked.find((a) => a.id === p.account_id).balance_kobo));
   let holdTx = null;
   if (held > 0) {
     holdTx = await ledger.postTransaction(client, {

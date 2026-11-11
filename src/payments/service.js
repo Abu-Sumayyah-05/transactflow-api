@@ -223,6 +223,8 @@ async function startBankTransfer({ userId, bank, accountNumber, amountKobo }, id
 
   const payment = await withTransaction(async (client) => {
     const walletId = await walletOf(client, userId);
+    // Lock first, before the payment row exists (see ledger.lockAccounts).
+    await ledger.lockAccounts(client, [walletId, 'TRANSFERS_IN_FLIGHT']);
     const p = await repo.create(client, {
       accountId: walletId,
       type: 'BANK_TRANSFER',

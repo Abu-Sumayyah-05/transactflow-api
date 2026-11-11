@@ -47,6 +47,8 @@ async function upload({ merchantId, csvText }, idem) {
 
   return withTransaction(async (client) => {
     const accountId = await walletOf(client, merchantId);
+    // Lock first, before the batch row exists (see ledger.lockAccounts).
+    if (total > 0) await ledger.lockAccounts(client, [accountId, 'PAYOUTS_RESERVED']);
     const { rows: created } = await client.query(
       `INSERT INTO payout_batches (merchant_id, account_id, status, total_rows, valid_rows, reserved_kobo, completed_at)
        VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5 = 0 THEN now() END) RETURNING *`,
