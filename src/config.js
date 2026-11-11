@@ -28,6 +28,11 @@ module.exports = {
   // A payment left in PENDING this long (process crashed mid-call) is swept to UNKNOWN.
   pendingStaleMs: Number(process.env.PENDING_STALE_MS || 2 * 60 * 1000),
   defaultBank: process.env.DEFAULT_BANK || 'A',
+  fallbackBank: process.env.FALLBACK_BANK || 'B',
+  // Module 8 retries: up to 3 attempts, full-jitter backoff from 200 ms, capped at 2 s.
+  retryMaxAttempts: Number(process.env.RETRY_MAX_ATTEMPTS || 3),
+  retryBaseMs: Number(process.env.RETRY_BASE_MS || 200),
+  retryCapMs: Number(process.env.RETRY_CAP_MS || 2000),
   // Webhooks: process right after receipt (tests turn this off and call
   // processDue themselves); retry with backoff; DLQ after max attempts.
   webhookInlineProcessing: process.env.WEBHOOK_INLINE_PROCESSING !== 'false',

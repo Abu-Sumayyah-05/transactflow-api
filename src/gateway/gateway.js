@@ -7,8 +7,22 @@
 //   UNKNOWN    anything else: timeout, network error, 5xx, garbage.
 //              We do NOT know whether money moved, so we must not guess.
 //
-// Phase 5 adds retries with backoff and the circuit breaker here.
+// Every call goes: circuit breaker -> retry loop -> one HTTP attempt.
 const config = require('../config');
+const { CircuitBreaker } = require('./circuitBreaker');
+const { withRetry, isRetryable } = require('./retry');
+
+const BANKS = ['A', 'B'];
+
+const breakers = Object.fromEntries(
+  BANKS.map((name) => [
+    name,
+    new CircuitBreaker({
+      name,
+      onStateChange: (from, to) => console.warn(`circuit breaker bank ${name}: ${from} -> ${to}`),
+    }),
+  ])
+);
 
 function bankUrl(bank) {
   const url = process.env[`BANK_${bank}_URL`];
@@ -17,6 +31,28 @@ function bankUrl(bank) {
 }
 
 async function call(bank, method, path, body) {
+  const breaker = breakers[bank];
+  if (!breaker) return { httpStatus: null, reason: 'unknown_bank' };
+
+  return withRetry(
+    async () => {
+      // Fail fast: an OPEN breaker means we don't even try.
+      if (!breaker.allow()) return { httpStatus: null, reason: 'circuit_open' };
+      const result = await attempt(bank, method, path, body);
+      // A bank that answered (even "declined" or 404) is healthy.
+      breaker.record(!isRetryable(result));
+      return result;
+    },
+    {
+      maxAttempts: config.retryMaxAttempts,
+      baseMs: config.retryBaseMs,
+      capMs: config.retryCapMs,
+      shouldContinue: () => breaker.isAvailable(),
+    }
+  );
+}
+
+async function attempt(bank, method, path, body) {
   let res;
   try {
     res = await fetch(`${bankUrl(bank)}${path}`, {
@@ -97,4 +133,27 @@ async function queryTransfer(bank, reference) {
   return interpretTransfer(r);
 }
 
-module.exports = { charge, queryCharge, nameEnquiry, transfer, queryTransfer };
+// Card payments can go to any bank (our vault holds the card), so route to
+// the first bank whose breaker would let a call through: A first, then B.
+// Returns null when every bank is down.
+function pickCardBank(preferred = [config.defaultBank, config.fallbackBank]) {
+  return preferred.find((name) => breakers[name]?.isAvailable()) ?? null;
+}
+
+const breakerState = (bank) => breakers[bank].snapshot().state;
+const breakerSnapshots = () => BANKS.map((name) => breakers[name].snapshot());
+const forceOpen = (bank) => breakers[bank].forceOpen();
+const resetBreakers = () => BANKS.forEach((name) => breakers[name].reset());
+
+module.exports = {
+  charge,
+  queryCharge,
+  nameEnquiry,
+  transfer,
+  queryTransfer,
+  pickCardBank,
+  breakerState,
+  breakerSnapshots,
+  forceOpen,
+  resetBreakers,
+};

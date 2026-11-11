@@ -7,7 +7,7 @@ const { pool, withTransaction } = require('../db/pool');
 const config = require('../config');
 const gateway = require('../gateway/gateway');
 const sm = require('./stateMachine');
-const { applyOutcome } = require('./outcomes');
+const { applyOutcome, scheduleTsq } = require('./outcomes');
 
 const BATCH = 20;
 const LEASE_SECONDS = 60;
@@ -28,10 +28,8 @@ async function sweepStalePending() {
     await withTransaction(async (client) => {
       const { rows: cur } = await client.query('SELECT status FROM payments WHERE id = $1 FOR UPDATE', [id]);
       if (cur[0].status !== 'PENDING') return; // the live request finished meanwhile
-      await sm.transition(client, id, 'UNKNOWN', {
-        reason: 'stale PENDING (no answer recorded)',
-        set: { tsq_next_at: new Date(), tsq_expires_at: new Date(Date.now() + config.tsqTtlMs) },
-      });
+      await sm.transition(client, id, 'UNKNOWN', { reason: 'stale PENDING (no answer recorded)' });
+      await scheduleTsq(client, id, 0); // due immediately, by the database clock
     });
   }
   return rows.length;
@@ -56,17 +54,27 @@ async function resolve(p) {
   return withTransaction((client) => applyOutcome(client, p.id, result));
 }
 
+// One tick: sweep stale PENDING, then work through everything that is due,
+// batch by batch, so a backlog can't starve newer payments. Each claimed
+// payment's next check moves out (lease or backoff), so the loop ends.
+const MAX_BATCHES_PER_TICK = 10;
+
 async function runOnce() {
   await sweepStalePending();
-  const due = await claimDue();
-  for (const p of due) {
-    try {
-      await resolve(p);
-    } catch (err) {
-      console.error(`tsq: payment ${p.id} failed to resolve: ${err.message}`);
+  let total = 0;
+  for (let i = 0; i < MAX_BATCHES_PER_TICK; i += 1) {
+    const due = await claimDue();
+    for (const p of due) {
+      try {
+        await resolve(p);
+      } catch (err) {
+        console.error(`tsq: payment ${p.id} failed to resolve: ${err.message}`);
+      }
     }
+    total += due.length;
+    if (due.length < BATCH) break;
   }
-  return due.length;
+  return total;
 }
 
 // Used by GET /payments/:id: one immediate check for one UNKNOWN payment.

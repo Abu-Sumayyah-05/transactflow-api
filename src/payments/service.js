@@ -35,7 +35,12 @@ async function finish(paymentId, result, idem) {
 async function startCardTopup({ userId, cardToken, amountKobo }, idem) {
   assertKobo(amountKobo);
   const card = await cardForCharge(pool, userId, String(cardToken || ''));
-  const bank = config.defaultBank;
+  // Module 8 fallback: if Bank A's breaker is OPEN, route to Bank B. If both
+  // are down, say so now, before anything is created or charged.
+  const bank = gateway.pickCardBank();
+  if (!bank) {
+    throw new AppError(503, 'BANKS_UNAVAILABLE', 'Card payments are temporarily unavailable. You have not been charged; please try again in a minute.');
+  }
 
   const payment = await withTransaction(async (client) => {
     const p = await repo.create(client, {

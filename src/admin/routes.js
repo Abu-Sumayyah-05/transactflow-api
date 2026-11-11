@@ -31,4 +31,9 @@ router.post('/dlq/:id/replay', async (req, res) => {
   res.json({ id: evt.id, event_id: evt.event_id, status: evt.status, attempts: evt.attempts, last_error: evt.last_error });
 });
 
+// Gateway health: circuit breaker state per bank (live dashboard).
+router.get('/gateway', (_req, res) => {
+  res.json({ banks: require('../gateway/gateway').breakerSnapshots() });
+});
+
 module.exports = { router };

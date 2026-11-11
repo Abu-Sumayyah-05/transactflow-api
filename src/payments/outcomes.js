@@ -47,25 +47,34 @@ async function settleFailure(client, p, result, reason) {
 
 // The bank's answer is not known. First time: move to UNKNOWN and schedule a
 // TSQ. Already UNKNOWN: back off, or past the TTL flag it for a human.
+// Schedule times always come from the DATABASE clock (now()), never from
+// Node's Date. The job that picks due payments compares against now() too,
+// and the two clocks can drift apart by tens of milliseconds or more.
+async function scheduleTsq(client, paymentId, delayMs) {
+  const { rows } = await client.query(
+    `UPDATE payments SET tsq_next_at = now() + make_interval(secs => $2::float8 / 1000),
+                         tsq_expires_at = now() + make_interval(secs => $3::float8 / 1000)
+      WHERE id = $1 RETURNING *`,
+    [paymentId, delayMs, config.tsqTtlMs]
+  );
+  return rows[0];
+}
+
 async function markUnknown(client, p, result) {
   if (p.status === 'PENDING') {
-    return sm.transition(client, p.id, 'UNKNOWN', {
-      reason: result.reason || 'no answer from bank',
-      set: {
-        tsq_next_at: new Date(Date.now() + config.tsqInitialDelayMs),
-        tsq_expires_at: new Date(Date.now() + config.tsqTtlMs),
-      },
-    });
+    await sm.transition(client, p.id, 'UNKNOWN', { reason: result.reason || 'no answer from bank' });
+    return scheduleTsq(client, p.id, config.tsqInitialDelayMs);
   }
+  // Past the TTL (judged by the database clock): stop asking, flag for a human.
   const attempts = p.tsq_attempts + 1;
-  const expired = p.tsq_expires_at && new Date(p.tsq_expires_at) <= new Date();
   const backoffMs = Math.min(1000 * 2 ** attempts, config.tsqMaxBackoffMs);
   const { rows } = await client.query(
     `UPDATE payments SET tsq_attempts = $2, updated_at = now(),
-            tsq_next_at = CASE WHEN $3 THEN NULL ELSE now() + make_interval(secs => $4::float8 / 1000) END,
-            needs_review = needs_review OR $3
+            tsq_next_at = CASE WHEN tsq_expires_at <= now() THEN NULL
+                               ELSE now() + make_interval(secs => $3::float8 / 1000) END,
+            needs_review = needs_review OR COALESCE(tsq_expires_at <= now(), false)
       WHERE id = $1 RETURNING *`,
-    [p.id, attempts, Boolean(expired), backoffMs]
+    [p.id, attempts, backoffMs]
   );
   return rows[0];
 }
@@ -89,4 +98,4 @@ async function applyOutcome(client, paymentId, result) {
   }
 }
 
-module.exports = { applyOutcome };
+module.exports = { applyOutcome, scheduleTsq };

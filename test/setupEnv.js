@@ -16,3 +16,6 @@ process.env.REDIS_URL = process.env.TEST_REDIS_URL;
 // Tests drive webhook processing explicitly with processDue(), and retry at once.
 process.env.WEBHOOK_INLINE_PROCESSING = 'false';
 process.env.WEBHOOK_RETRY_BASE_MS = '0';
+// Gateway retries: same policy, tiny waits.
+process.env.RETRY_BASE_MS = '5';
+process.env.RETRY_CAP_MS = '20';
