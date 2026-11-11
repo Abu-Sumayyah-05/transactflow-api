@@ -65,7 +65,8 @@ Mock bank modes are switched live with `POST /_sim/mode` on the bank (header `x-
 | 3. Payment lifecycle (+ card vault, bank transfers) | Done | Timeout mode: payment goes UNKNOWN, then TSQ moves it to the bank's real status; 92 tests pass |
 | 4. Idempotency and webhooks | Done | Same key twice charges once; changed body returns 409; duplicate webhook processed once; 111 tests pass |
 | 5. Resilience | Done | 503 mode opens Bank A's breaker and card traffic moves to Bank B; two simultaneous spends of one balance let only one through; 152 tests pass |
-| 6. Fraud and checkout | Awaiting approval | Scores land in the right bands at every edge (0/40/41/79/80); an 8-attempt card-testing burst lets exactly 5 through and blocks 3, none of which reach a bank; 226 tests pass |
+| 6. Fraud and checkout | Done | Scores land in the right bands at every edge (0/40/41/79/80); an 8-attempt card-testing burst lets exactly 5 through and blocks 3, none of which reach a bank; 226 tests pass |
+| 7. Payouts | Awaiting approval | A 250-item batch runs as 3 sub-batches (100, 100, 50) in order; after a crash mid-batch the rerun completes it and the bank processes each transfer exactly once; 278 tests pass |
 
 ### Design note for Phase 10
 
