@@ -65,13 +65,15 @@ async function attempt(bank, method, path, body) {
     const reason = err.name === 'TimeoutError' ? 'timeout' : 'network_error';
     return { httpStatus: null, reason };
   }
+  let text = '';
   let json = null;
   try {
-    json = await res.json();
+    text = await res.text();
+    json = JSON.parse(text);
   } catch {
-    /* non-JSON body: treated as unknown below */
+    /* non-JSON body: json stays null (treated as unknown by the callers) */
   }
-  return { httpStatus: res.status, json };
+  return { httpStatus: res.status, json, text };
 }
 
 function unknown(r) {
@@ -91,7 +93,7 @@ async function charge(bank, { reference, amountKobo, card }) {
 
 function interpretCharge(r) {
   if (r.httpStatus === 200 && r.json?.status === 'APPROVED') {
-    return { outcome: 'SUCCESS', responseCode: r.json.response_code, bankReference: r.json.bank_reference };
+    return { outcome: 'SUCCESS', responseCode: r.json.response_code, bankReference: r.json.bank_reference, amountKobo: r.json.amount_kobo };
   }
   if (r.httpStatus === 200 && r.json?.status === 'DECLINED') {
     return { outcome: 'DECLINED', responseCode: r.json.response_code, bankReference: r.json.bank_reference };
@@ -114,7 +116,7 @@ async function nameEnquiry(bank, accountNumber) {
 
 function interpretTransfer(r) {
   if (r.httpStatus === 200 && r.json?.status === 'SUCCESSFUL') {
-    return { outcome: 'SUCCESS', responseCode: r.json.response_code, bankReference: r.json.bank_reference };
+    return { outcome: 'SUCCESS', responseCode: r.json.response_code, bankReference: r.json.bank_reference, amountKobo: r.json.amount_kobo };
   }
   if (r.httpStatus === 200 && r.json?.status === 'FAILED') {
     return { outcome: 'DECLINED', responseCode: r.json.response_code, bankReference: r.json.bank_reference };
@@ -131,6 +133,14 @@ async function queryTransfer(bank, reference) {
   const r = await call(bank, 'GET', `/transfers/${encodeURIComponent(reference)}`);
   if (r.httpStatus === 404 && r.json?.status === 'NOT_FOUND') return { outcome: 'NOT_FOUND' };
   return interpretTransfer(r);
+}
+
+// Reconciliation (Module 11): asks the bank to close the day and hand over
+// its settlement file. Returns { ok, text } or { ok: false, reason }.
+async function fetchSettlement(bank) {
+  const r = await call(bank, 'POST', '/settlements');
+  if (r.httpStatus === 200 && typeof r.text === 'string' && r.text.length) return { ok: true, text: r.text };
+  return { ok: false, reason: r.reason || `http_${r.httpStatus}` };
 }
 
 // Card payments can go to any bank (our vault holds the card), so route to
@@ -153,6 +163,7 @@ module.exports = {
   nameEnquiry,
   transfer,
   queryTransfer,
+  fetchSettlement,
   pickCardBank,
   bankAvailable,
   breakerState,

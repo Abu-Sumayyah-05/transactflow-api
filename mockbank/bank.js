@@ -18,9 +18,16 @@
 //            'off'            no webhooks
 // POST /_sim/disputes { reference, amount_kobo?, reason? } raises a chargeback
 // (a charge.disputed webhook) for an approved charge.
-// Settlement-file modes are added in Phase 9.
+//
+// Settlement file (MT940 style): POST /settlements closes the period and
+// returns the file. `settlement` in the mode sets its faults:
+//   { badLine, missing, wrongClosing, wrongAmount, duplicate, extra }
+//   { cutoff: <ISO time> }   late settlement: anything the bank processed
+//                            after this instant is left for the next file
+// See mockbank/settlement.js.
 const express = require('express');
 const crypto = require('crypto');
+const { buildStatement } = require('./settlement');
 
 const DEFAULT_MODE = Object.freeze({
   mode: 'normal',
@@ -31,6 +38,7 @@ const DEFAULT_MODE = Object.freeze({
   holdMs: 60000,
   webhook: 'normal',
   webhookCopies: 3,
+  settlement: {},
 });
 
 // One code for each category the decline classifier must cover.
@@ -53,6 +61,8 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     calls: { charge: 0, transfer: 0 }, // new requests the bank actually processed
     requests: { charge: 0, transfer: 0 }, // every request, including deduped repeats
     declineIndex: 0,
+    // Our settlement account at this bank: statements so far and the balance.
+    settlement: { seq: 0, balanceKobo: 0, latest: null },
   };
 
   function setMode(patch) {
@@ -67,6 +77,7 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     state.calls = { charge: 0, transfer: 0 };
     state.requests = { charge: 0, transfer: 0 };
     state.declineIndex = 0;
+    state.settlement = { seq: 0, balanceKobo: 0, latest: null };
   }
 
   const app = express();
@@ -225,7 +236,7 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
       status = 'FAILED';
       code = state.mode.declineCode;
     }
-    const record = { reference, account_number: accountNumber, amount_kobo: amount, status, response_code: code, bank_reference: bankRef() };
+    const record = { reference, account_number: accountNumber, amount_kobo: amount, status, response_code: code, bank_reference: bankRef(), at: new Date().toISOString() };
     state.transfers.set(reference, record);
     reply(res, record);
     sendWebhook(status === 'SUCCESSFUL' ? 'transfer.completed' : 'transfer.failed', resultData(record));
@@ -237,7 +248,39 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     res.json(record);
   });
 
-  return { app, state, setMode, reset, DECLINE_CYCLE };
+  // End of day: everything processed up to the cut-off and not yet settled
+  // goes into one statement. Returns the MT940-style text.
+  function closeSettlement() {
+    const faults = state.mode.settlement || {};
+    const cutoff = faults.cutoff ? new Date(faults.cutoff) : new Date();
+    const due = (records, ok, direction, kind) =>
+      [...records.values()]
+        .filter((r) => r.status === ok && !r.settled && new Date(r.at) <= cutoff)
+        .map((r) => ({ record: r, direction, kind, amount_kobo: r.amount_kobo, reference: r.reference, bank_reference: r.bank_reference, at: r.at }));
+    const items = [...due(state.charges, 'APPROVED', 'C', 'CARD CHARGE'), ...due(state.transfers, 'SUCCESSFUL', 'D', 'TRANSFER')].sort((a, b) =>
+      a.at.localeCompare(b.at)
+    );
+    state.settlement.seq += 1;
+    const { text, closing_kobo: closing } = buildStatement({
+      bank: name,
+      seq: state.settlement.seq,
+      openingKobo: state.settlement.balanceKobo,
+      items,
+      cutoff,
+      faults,
+    });
+    for (const i of items) i.record.settled = state.settlement.seq; // even one "left out" by a fault
+    state.settlement.balanceKobo = closing;
+    state.settlement.latest = text;
+    return text;
+  }
+  app.post('/settlements', (_req, res) => res.type('text/plain').send(closeSettlement()));
+  app.get('/settlements/latest', (_req, res) => {
+    if (!state.settlement.latest) return res.status(404).json({ error: 'no statement yet' });
+    res.type('text/plain').send(state.settlement.latest);
+  });
+
+  return { app, state, setMode, reset, closeSettlement, DECLINE_CYCLE };
 }
 
 module.exports = { createBank, ACCOUNTS, DECLINE_CYCLE };

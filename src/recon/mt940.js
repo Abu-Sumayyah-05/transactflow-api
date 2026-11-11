@@ -64,13 +64,14 @@ function parseEntry(value) {
   return { direction: m[2], amount_kobo: amount, reference: m[4], bank_reference: m[5], value_date: date };
 }
 
-// ":13D:" value: YYMMDDHHMM+HHMM.
+// ":13D:" value: YYMMDDHHMM+HHMM. Our simulator adds seconds and
+// milliseconds (YYMMDDHHMMSS.mmm+HHMM); both forms are accepted.
 function parseCutoff(value) {
-  const m = /^(\d{6})(\d{2})(\d{2})([+-])(\d{2})(\d{2})$/.exec(value);
+  const m = /^(\d{6})(\d{2})(\d{2})(?:(\d{2})(?:\.(\d{3}))?)?([+-])(\d{2})(\d{2})$/.exec(value);
   if (!m) return null;
   const date = parseDate(m[1]);
   if (!date) return null;
-  const d = new Date(`${date}T${m[2]}:${m[3]}:00${m[4]}${m[5]}:${m[6]}`);
+  const d = new Date(`${date}T${m[2]}:${m[3]}:${m[4] || '00'}.${m[5] || '000'}${m[6]}${m[7]}:${m[8]}`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
