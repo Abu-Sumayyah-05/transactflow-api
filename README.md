@@ -51,6 +51,7 @@ npm run migrate             # applies src/db/migrations/*.sql
 npm test                    # resets transactflow_test and runs every test
 npm run bank:a              # Mock Bank A on http://localhost:5001 (separate terminal)
 npm run dev                 # API on http://localhost:4000
+npm run worker              # background jobs: outbox relay, TSQ, webhook retries, payouts (separate terminal)
 ```
 
 Mock bank modes are switched live with `POST /_sim/mode` on the bank (header `x-sim-token: $SIM_TOKEN`), for example `{"mode":"timeout"}`, `{"mode":"error503","errorRate":0.5}` or `{"outcome":"DECLINED","declineCode":"51"}`. Webhook behaviour is part of the same mode: `{"webhook":"duplicate","webhookCopies":3}`, `{"webhook":"bad_signature"}` or `{"webhook":"off"}`. `{"outcome":"DECLINE_CYCLE"}` declines with each code in turn (51, 57, 61, 59, 54, 82), and `POST /_sim/disputes {"reference":"TF-..."}` raises a chargeback for an approved charge. The admin console wraps this in Phase 10.
@@ -66,7 +67,8 @@ Mock bank modes are switched live with `POST /_sim/mode` on the bank (header `x-
 | 4. Idempotency and webhooks | Done | Same key twice charges once; changed body returns 409; duplicate webhook processed once; 111 tests pass |
 | 5. Resilience | Done | 503 mode opens Bank A's breaker and card traffic moves to Bank B; two simultaneous spends of one balance let only one through; 152 tests pass |
 | 6. Fraud and checkout | Done | Scores land in the right bands at every edge (0/40/41/79/80); an 8-attempt card-testing burst lets exactly 5 through and blocks 3, none of which reach a bank; 226 tests pass |
-| 7. Payouts | Awaiting approval | A 250-item batch runs as 3 sub-batches (100, 100, 50) in order; after a crash mid-batch the rerun completes it and the bank processes each transfer exactly once; 278 tests pass |
+| 7. Payouts | Done | A 250-item batch runs as 3 sub-batches (100, 100, 50) in order; after a crash mid-batch the rerun completes it and the bank processes each transfer exactly once; 278 tests pass |
+| 8. Outbox, worker and metrics | Awaiting approval | A process is killed (SIGKILL) after its database commit and before publishing; the relay still delivers the event to the Redis stream, exactly once; 290 tests pass |
 
 ### Design note for Phase 10
 
