@@ -125,7 +125,9 @@ test.describe('customer app', () => {
   });
 
   test('3. checkout: a bank timeout ends in the correct final status, not a guess', async ({ page, request }) => {
-    await setBank(request, { mode: 'timeout' }); // the bank takes the money but never answers
+    // The bank takes the money but never answers, and sends no webhook
+    // either, so the only way to learn the truth is to ask it (TSQ).
+    await setBank(request, { mode: 'timeout', webhook: 'off' });
     await signIn(page, customer.email);
     await fillCheckout(page, { amount: '300' });
     await expect(page.getByRole('heading', { name: /Confirming/ })).toBeVisible({ timeout: 20_000 });
@@ -188,7 +190,7 @@ test.describe('customer app', () => {
     await expect(receipt).toContainText('insufficient funds');
   });
 
-  test('6. payouts: upload a CSV, batch progress bar, per-item result report', async ({ page }) => {
+  test('6. payouts: upload a CSV, batch progress bar, per-item result report', async ({ page, request }) => {
     // A customer sees why they can't; the menu doesn't even offer it.
     await signIn(page, customer.email);
     await expect(page.getByRole('link', { name: 'Payouts' })).toHaveCount(0);
@@ -217,9 +219,18 @@ test.describe('customer app', () => {
     await expect(batch.locator('tbody tr').filter({ hasText: 'INV-0003' })).toContainText("Name does not match the bank's record");
     await expect(batch.locator('tbody tr').filter({ hasText: 'INV-0004' })).toContainText('Account number must be 10 digits');
 
-    const download = page.waitForEvent('download');
-    await batch.getByRole('button', { name: 'Download report (CSV)' }).click();
-    expect((await download).suggestedFilename()).toMatch(/^payout-report-.*\.csv$/);
+    // The itemised report as a file. (The button is checked for presence and
+    // the file is fetched directly: the installed Edge closes itself after a
+    // real download when driven by a test.)
+    await expect(batch.getByRole('button', { name: 'Download report (CSV)' })).toBeEnabled();
+    const merchant = await apiAs(request, MERCHANT);
+    const { batches } = await (await merchant.get('/payouts/batches')).json();
+    const file = await merchant.get(`/payouts/batches/${batches[0].id}?format=csv`);
+    expect(file.headers()['content-type']).toContain('text/csv');
+    const lines = (await file.text()).trim().split(/\r?\n/);
+    expect(lines).toHaveLength(5);
+    expect(lines[1]).toContain('INV-0001,A,0123456789,Ngozi Eze,1500.00,PAID');
+    expect(lines[3]).toContain('NAME_MISMATCH');
   });
 });
 
@@ -311,28 +322,6 @@ test.describe('admin console', () => {
     expect(after.status).toBe('COMPLETED');
   });
 
-  test('6. simulator controls: a 503 outage opens the breaker and traffic moves to Bank B', async ({ page, request }) => {
-    await page.getByRole('link', { name: 'Simulator controls' }).click();
-    const simA = page.getByTestId('sim-A');
-    await simA.getByRole('button', { name: 'Error 503' }).click();
-    await simA.getByRole('button', { name: 'Apply to Bank A' }).click();
-    await expect(simA.getByText('applied')).toBeVisible();
-
-    const buyer = await apiAs(request, customer.email);
-    const cards = await (await buyer.get('/cards')).json();
-    const pay = async () => (await buyer.post('/payments', { card_token: cards.cards[0].token, amount_kobo: 1000, billing_address: US })).json();
-    await pay();
-    await pay();
-    const third = await pay();
-    expect(third).toMatchObject({ bank: 'B', status: 'COMPLETED' });
-
-    await page.getByRole('link', { name: 'Live dashboard' }).click();
-    await expect(page.getByTestId('bank-A').getByText('OPEN', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('bank-B').getByText('CLOSED')).toBeVisible();
-
-    await setBank(request, {});
-  });
-
   test('3. reconciliation: matched, pending and break counts; a broken file halts the run', async ({ page, request }) => {
     await page.getByRole('link', { name: 'Reconciliation' }).click();
 
@@ -350,9 +339,15 @@ test.describe('admin console', () => {
     await brk.getByRole('button', { name: 'Save' }).click();
     await expect(brk).toContainText('resolved');
 
-    const download = page.waitForEvent('download');
-    await run.getByRole('button', { name: 'Exceptions (CSV)' }).click();
-    expect((await download).suggestedFilename()).toMatch(/^recon-exceptions-run-\d+\.csv$/);
+    // The four reports are offered, and the audit one records the resolution.
+    for (const name of ['Summary', 'Exceptions', 'Outstanding by age', 'Audit trail']) {
+      await expect(run.getByRole('button', { name: `${name} (CSV)` })).toBeEnabled();
+    }
+    const adminApi = await apiAs(request, ADMIN);
+    const { runs } = await (await adminApi.get('/admin/recon/runs')).json();
+    const audit = await adminApi.get(`/admin/recon/reports/audit?run=${runs[0].id}&format=csv`);
+    expect(audit.headers()['content-type']).toContain('text/csv');
+    expect(await audit.text()).toContain('ITEM_RESOLVED');
 
     // A wrong closing balance: the run halts and says why.
     const buyer = await apiAs(request, customer.email);
@@ -384,5 +379,28 @@ test.describe('admin console', () => {
     // Replayed and failed again for the same reason: it stays, with the reason.
     await expect(dead.getByRole('button', { name: 'Replay' })).toBeEnabled();
     await expect(dead.getByRole('alert')).toContainText('dispute amount');
+  });
+
+  // Last on purpose: it opens Bank A's breaker, which stays open for 60 seconds.
+  test('6. simulator controls: a 503 outage opens the breaker and traffic moves to Bank B', async ({ page, request }) => {
+    await page.getByRole('link', { name: 'Simulator controls' }).click();
+    const simA = page.getByTestId('sim-A');
+    await simA.getByRole('button', { name: 'Error 503' }).click();
+    await simA.getByRole('button', { name: 'Apply to Bank A' }).click();
+    await expect(simA.getByText('applied')).toBeVisible();
+
+    const buyer = await apiAs(request, customer.email);
+    const cards = await (await buyer.get('/cards')).json();
+    const pay = async () => (await buyer.post('/payments', { card_token: cards.cards[0].token, amount_kobo: 1000, billing_address: US })).json();
+    await pay();
+    await pay();
+    const third = await pay();
+    expect(third).toMatchObject({ bank: 'B', status: 'COMPLETED' });
+
+    await page.getByRole('link', { name: 'Live dashboard' }).click();
+    await expect(page.getByTestId('bank-A').getByText('OPEN', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('bank-B').getByText('CLOSED')).toBeVisible();
+
+    await setBank(request, {});
   });
 });

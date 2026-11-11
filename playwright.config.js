@@ -14,6 +14,10 @@ module.exports = defineConfig({
   reporter: [['list']],
   use: {
     baseURL: 'http://localhost:4100',
+    // Uses the Edge already installed on Windows, so no browser download is
+    // needed. Set PW_CHANNEL=chrome (or chromium after `npx playwright
+    // install chromium`) to use another.
+    channel: process.env.PW_CHANNEL || 'msedge',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
