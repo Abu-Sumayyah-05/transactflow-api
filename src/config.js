@@ -44,6 +44,16 @@ module.exports = {
   challengeTtlMs: Number(process.env.CHALLENGE_TTL_MS || 10 * 60 * 1000),
   challengeMaxAttempts: Number(process.env.CHALLENGE_MAX_ATTEMPTS || 3),
   challengeRevealOtp: process.env.CHALLENGE_REVEAL_OTP === 'true',
+  // Module 6 payouts. Sub-batches are always 100 (spec); these tune the rest.
+  payoutMaxRows: Number(process.env.PAYOUT_MAX_ROWS || 5000),
+  payoutMinItemKobo: Number(process.env.PAYOUT_MIN_ITEM_KOBO || 100), // ₦1
+  payoutMaxItemKobo: Number(process.env.PAYOUT_MAX_ITEM_KOBO || 500_000_000), // ₦5,000,000
+  // Backpressure: items sent at once within a sub-batch, and how many of a
+  // batch's payments may be unresolved (PENDING/UNKNOWN) before it pauses.
+  payoutConcurrency: Number(process.env.PAYOUT_CONCURRENCY || 10),
+  payoutMaxInFlight: Number(process.env.PAYOUT_MAX_IN_FLIGHT || 50),
+  payoutLeaseSeconds: Number(process.env.PAYOUT_LEASE_SECONDS || 60),
+  payoutIntervalMs: Number(process.env.PAYOUT_INTERVAL_MS || 2000),
   // Webhooks: process right after receipt (tests turn this off and call
   // processDue themselves); retry with backoff; DLQ after max attempts.
   webhookInlineProcessing: process.env.WEBHOOK_INLINE_PROCESSING !== 'false',

@@ -54,6 +54,13 @@ async function makeAdmin(user) {
   return { ...user, token: login.body.token };
 }
 
+// Same for merchants (payouts are merchant-only).
+async function makeMerchant(user) {
+  await require('../src/db/pool').pool.query("UPDATE users SET role = 'merchant' WHERE id = $1", [user.userId]);
+  const login = await request(app).post('/api/v1/auth/login').send({ email: user.email, password: user.password });
+  return { ...user, token: login.body.token };
+}
+
 // Signs a webhook body the way a bank does: HMAC-SHA256 over the raw bytes.
 function signWebhook(rawBody, secret) {
   return `sha256=${randomHmac(rawBody, secret)}`;
@@ -62,4 +69,4 @@ function randomHmac(rawBody, secret) {
   return require('crypto').createHmac('sha256', secret).update(rawBody).digest('hex');
 }
 
-module.exports = { app, request, uniqueEmail, registerAndLogin, fundWallet, addCard, balanceOf, makeAdmin, signWebhook, TEST_CARD };
+module.exports = { app, request, uniqueEmail, registerAndLogin, fundWallet, addCard, balanceOf, makeAdmin, makeMerchant, signWebhook, TEST_CARD };

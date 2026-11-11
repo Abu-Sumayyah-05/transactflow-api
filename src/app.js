@@ -8,6 +8,7 @@ const cards = require('./cards/cards');
 const payments = require('./payments/routes');
 const webhooks = require('./webhooks/routes');
 const admin = require('./admin/routes');
+const payouts = require('./payouts/routes');
 
 const app = express();
 app.disable('x-powered-by');
@@ -26,6 +27,7 @@ v1.use('/accounts', auth.requireAuth, accounts.router);
 v1.use('/transfers', auth.requireAuth, transfers.router);
 v1.use('/cards', auth.requireAuth, cards.router);
 v1.use('/payments', auth.requireAuth, payments.router);
+v1.use('/payouts', auth.requireAuth, auth.requireRole('merchant'), payouts.router);
 v1.use('/admin', auth.requireAuth, auth.requireRole('admin'), admin.router);
 app.use('/api/v1', v1);
 
