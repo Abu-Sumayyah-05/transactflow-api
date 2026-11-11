@@ -140,6 +140,8 @@ function pickCardBank(preferred = [config.defaultBank, config.fallbackBank]) {
   return preferred.find((name) => breakers[name]?.isAvailable()) ?? null;
 }
 
+// Would this bank's breaker let a call through right now?
+const bankAvailable = (bank) => Boolean(breakers[bank]?.isAvailable());
 const breakerState = (bank) => breakers[bank].snapshot().state;
 const breakerSnapshots = () => BANKS.map((name) => breakers[name].snapshot());
 const forceOpen = (bank) => breakers[bank].forceOpen();
@@ -152,6 +154,7 @@ module.exports = {
   transfer,
   queryTransfer,
   pickCardBank,
+  bankAvailable,
   breakerState,
   breakerSnapshots,
   forceOpen,

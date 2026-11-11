@@ -50,7 +50,8 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     mode: { ...DEFAULT_MODE },
     charges: new Map(),
     transfers: new Map(),
-    calls: { charge: 0, transfer: 0 },
+    calls: { charge: 0, transfer: 0 }, // new requests the bank actually processed
+    requests: { charge: 0, transfer: 0 }, // every request, including deduped repeats
     declineIndex: 0,
   };
 
@@ -64,6 +65,7 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     state.charges.clear();
     state.transfers.clear();
     state.calls = { charge: 0, transfer: 0 };
+    state.requests = { charge: 0, transfer: 0 };
     state.declineIndex = 0;
   }
 
@@ -167,6 +169,7 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
       return res.status(400).json({ error: 'bad request' });
     }
     // Banks dedupe on the merchant reference: a retry returns the first result.
+    state.requests.charge += 1;
     if (state.charges.has(reference)) return reply(res, state.charges.get(reference));
 
     state.calls.charge += 1;
@@ -209,6 +212,7 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     if (!reference || !Number.isSafeInteger(amount) || !accountNumber) {
       return res.status(400).json({ error: 'bad request' });
     }
+    state.requests.transfer += 1;
     if (state.transfers.has(reference)) return reply(res, state.transfers.get(reference));
 
     state.calls.transfer += 1;

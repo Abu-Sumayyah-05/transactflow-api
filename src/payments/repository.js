@@ -11,12 +11,13 @@ function newReference() {
 async function create(client, {
   accountId, type, amountKobo, bank, cardToken = null, destinationAccount = null, destinationName = null,
   billingCountry = null, billingAddressHash = null, deviceId = null,
+  reference = newReference(), // payouts pass the item's idempotency key
 }) {
   const { rows } = await client.query(
     `INSERT INTO payments (reference, account_id, type, amount_kobo, bank, card_token, destination_account,
                            destination_name, billing_country, billing_address_hash, device_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-    [newReference(), accountId, type, amountKobo, bank, cardToken, destinationAccount, destinationName,
+    [reference, accountId, type, amountKobo, bank, cardToken, destinationAccount, destinationName,
       billingCountry, billingAddressHash, deviceId]
   );
   await client.query(

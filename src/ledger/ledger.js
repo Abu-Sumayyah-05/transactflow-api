@@ -73,6 +73,30 @@ async function postTransaction(client, { entries, memo = null, reverses = null }
   return transactionId;
 }
 
+// Locks account rows (FOR UPDATE) in sorted order and returns them.
+//
+// Rule for every money transaction: call this FIRST, with every account the
+// transaction will touch, before inserting anything. Two reasons:
+//   1. One order for everyone. If A locks wallet-then-reserve while B locks
+//      reserve-then-wallet, each can end up waiting for the other forever
+//      (a deadlock). Sorted ids make them queue instead.
+//   2. No lock upgrades. Inserting a row that points at an account (a
+//      payment, a payout batch) quietly takes a light lock on that account.
+//      Two transactions that both do that and THEN ask for FOR UPDATE block
+//      each other. Taking FOR UPDATE first avoids it.
+// Accepts account ids or system account codes ('ESCROW').
+async function lockAccounts(client, idsOrCodes) {
+  const ids = [];
+  for (const x of idsOrCodes) ids.push(/^[0-9a-f-]{36}$/i.test(x) ? x : await getSystemAccountId(client, x));
+  const sorted = [...new Set(ids)].sort();
+  const { rows } = await client.query(
+    'SELECT id, type, code, balance_kobo FROM accounts WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE',
+    [sorted]
+  );
+  if (rows.length !== sorted.length) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'One of the accounts does not exist');
+  return rows;
+}
+
 // Undo a transaction by posting its mirror image. The original rows stay.
 async function reverseTransaction(client, transactionId, memo) {
   const { rows } = await client.query(
@@ -114,4 +138,4 @@ async function findBalanceMismatches(db) {
   return rows;
 }
 
-module.exports = { postTransaction, reverseTransaction, getSystemAccountId, findBalanceMismatches };
+module.exports = { postTransaction, reverseTransaction, lockAccounts, getSystemAccountId, findBalanceMismatches };

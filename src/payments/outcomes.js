@@ -36,8 +36,23 @@ async function settleSuccess(client, p, result) {
 
 async function settleFailure(client, p, result, reason) {
   if (p.type === 'BANK_TRANSFER' && p.hold_transaction_id) {
+    const payout = await client.query('SELECT 1 FROM payout_items WHERE payment_id = $1', [p.id]);
+    // Two postings follow for a payout, so lock all three accounts up front
+    // in one order (see ledger.lockAccounts).
+    if (payout.rowCount) await ledger.lockAccounts(client, [p.account_id, 'PAYOUTS_RESERVED', 'TRANSFERS_IN_FLIGHT']);
     // Give the held money back with a reversing entry (never by editing).
     await ledger.reverseTransaction(client, p.hold_transaction_id, `transfer ${p.reference} failed`);
+    // A payout item's hold came from the batch reserve, so the reversal puts
+    // it back there; release it on to the merchant's wallet.
+    if (payout.rowCount) {
+      await ledger.postTransaction(client, {
+        memo: `payout ${p.reference} failed: reserve released`,
+        entries: [
+          { accountId: await ledger.getSystemAccountId(client, 'PAYOUTS_RESERVED'), direction: 'DEBIT', amountKobo: p.amount_kobo },
+          { accountId: p.account_id, direction: 'CREDIT', amountKobo: p.amount_kobo },
+        ],
+      });
+    }
   }
   return sm.transition(client, p.id, 'FAILED', {
     reason,

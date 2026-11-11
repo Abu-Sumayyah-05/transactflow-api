@@ -22,6 +22,7 @@ CREATE TABLE payout_batches (
   -- One runner works a batch at a time. A runner that crashes simply lets
   -- its lease run out, and the next one carries on where it stopped.
   lease_until             TIMESTAMPTZ,
+  lease_owner             TEXT,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
   completed_at            TIMESTAMPTZ
 );
