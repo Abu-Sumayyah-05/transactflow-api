@@ -9,7 +9,7 @@ const router = express.Router();
 // PostgreSQL every time. Balances are never cached (Module 10).
 router.get('/me', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT a.id, a.currency, a.balance_kobo, u.full_name, u.email, u.kyc_status
+    `SELECT a.id, a.currency, a.balance_kobo, u.full_name, u.email, u.kyc_status, u.role
        FROM accounts a JOIN users u ON u.id = a.user_id
       WHERE a.user_id = $1 AND a.type = 'WALLET'`,
     [req.user.id]

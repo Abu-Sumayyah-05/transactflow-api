@@ -123,6 +123,8 @@ router.get('/recon/reports/:name', async (req, res) => {
   res.json(report);
 });
 
+router.use('/simulator', require('./simulator').router);
+
 // Live dashboard numbers: success rate, p99 latency, authorization rate by
 // bank. ?window=<minutes> (default 60) or ?since=<ISO time>.
 router.get('/metrics', async (req, res) => {
