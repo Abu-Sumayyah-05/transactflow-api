@@ -36,7 +36,9 @@ export default function Checkout() {
   usePaymentPolling(payment, setPayment);
 
   const saved = cards.data?.cards || [];
-  const useNew = cardToken === '' || cardToken === 'new';
+  // Default to the most recent saved card; "new" only when chosen or none saved.
+  const chosen = cardToken || saved[0]?.token || 'new';
+  const useNew = chosen === 'new';
 
   const startOver = () => {
     payKey.current = newKey();
@@ -53,7 +55,7 @@ export default function Checkout() {
     pay.run(async () => {
       const kobo = nairaToKobo(amount);
       if (!kobo) throw new Error('Enter an amount in naira, such as 1500 or 1500.50');
-      let token = cardToken;
+      let token = chosen;
       if (useNew) {
         const created = await api.post('/cards', {
           number: card.number,
@@ -133,6 +135,8 @@ export default function Checkout() {
     );
   }
 
+  if (cards.loading) return null; // wait until we know whether a card is saved
+
   return (
     <Page title="Top up" subtitle="Add money to your wallet from a card.">
       <form className="grid cols-2" onSubmit={submit}>
@@ -159,13 +163,13 @@ export default function Checkout() {
           <h2>Card</h2>
           {saved.length > 0 && (
             <Field label="Pay with">
-              <select value={useNew ? 'new' : cardToken} onChange={(e) => setCardToken(e.target.value)}>
-                <option value="new">A new card</option>
+              <select value={chosen} onChange={(e) => setCardToken(e.target.value)}>
                 {saved.map((c) => (
                   <option key={c.token} value={c.token}>
                     {c.brand.toUpperCase()} ending {c.last4} (expires {String(c.exp_month).padStart(2, '0')}/{c.exp_year})
                   </option>
                 ))}
+                <option value="new">A new card</option>
               </select>
             </Field>
           )}

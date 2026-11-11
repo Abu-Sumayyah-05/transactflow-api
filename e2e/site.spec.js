@@ -32,6 +32,8 @@ async function signUp(page, email, name) {
 
 async function fillCheckout(page, { amount, billing = US, number = '4111 1111 1111 1111' }) {
   await page.getByRole('link', { name: 'Top up' }).first().click();
+  // The form appears once the saved cards have loaded.
+  await expect(page.getByRole('button', { name: 'Pay', exact: true })).toBeVisible();
   await page.getByLabel('Amount in naira').fill(amount);
   await page.getByLabel('Street address').fill(billing.line1);
   await page.getByLabel('City').fill(billing.city);
