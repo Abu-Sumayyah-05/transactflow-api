@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 require('./config');
 const { AppError } = require('./errors');
@@ -36,6 +38,15 @@ v1.use('/payments', auth.requireAuth, payments.router);
 v1.use('/payouts', auth.requireAuth, auth.requireRole('merchant'), payouts.router);
 v1.use('/admin', auth.requireAuth, auth.requireRole('admin'), admin.router);
 app.use('/api/v1', v1);
+
+// The built React app (web/dist), when it exists: Express serves it, so one
+// process can run the whole site. Any address that isn't an API route gets
+// index.html and the React router takes over from there.
+const webDist = path.join(__dirname, '..', 'web', 'dist');
+if (fs.existsSync(path.join(webDist, 'index.html'))) {
+  app.use(express.static(webDist));
+  app.get(/^\/(?!api\/|health$).*/, (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
+}
 
 app.use((_req, _res, next) => next(new AppError(404, 'NOT_FOUND', 'Route not found')));
 

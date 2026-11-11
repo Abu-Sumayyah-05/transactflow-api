@@ -12,7 +12,10 @@
     "db:up": "docker compose up -d --wait postgres redis",
     "test": "jest --runInBand",
     "bank:a": "node mockbank/server.js A",
-    "bank:b": "node mockbank/server.js B"
+    "bank:b": "node mockbank/server.js B",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "e2e": "npm --prefix web run build && playwright test"
   },
   "jest": {
     "testEnvironment": "node",
@@ -23,7 +26,12 @@
     "setupFilesAfterEnv": [
       "./test/teardown.js"
     ],
-    "testTimeout": 20000
+    "testTimeout": 20000,
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/e2e/",
+      "/web/"
+    ]
   },
   "engines": {
     "node": ">=20"
@@ -38,6 +46,7 @@
     "pg": "^8.23.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.1",
     "jest": "^30.5.2",
     "supertest": "^7.3.2"
   }
