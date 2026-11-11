@@ -10,6 +10,7 @@
 const { pool, withTransaction } = require('../db/pool');
 const config = require('../config');
 const { applyOutcome } = require('../payments/outcomes');
+const disputes = require('../disputes/disputes');
 
 class PermanentError extends Error {}
 
@@ -21,6 +22,11 @@ const TYPES = {
 };
 
 async function handleEvent(client, evt) {
+  // A chargeback: hold the money in ESCROW until an admin resolves it.
+  if (evt.event_type === 'charge.disputed') {
+    await disputes.openFromWebhook(client, evt, PermanentError);
+    return;
+  }
   const kind = TYPES[evt.event_type];
   if (!kind) return; // an event type we don't act on; record it as processed
   const data = evt.payload?.data || {};

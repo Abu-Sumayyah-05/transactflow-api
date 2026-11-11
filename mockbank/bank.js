@@ -16,6 +16,8 @@
 //            'duplicate'      the same event webhookCopies (default 3) times
 //            'bad_signature'  signed with the wrong secret
 //            'off'            no webhooks
+// POST /_sim/disputes { reference, amount_kobo?, reason? } raises a chargeback
+// (a charge.disputed webhook) for an approved charge.
 // Settlement-file modes are added in Phase 9.
 const express = require('express');
 const crypto = require('crypto');
@@ -81,6 +83,21 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     reset();
     res.json({ ok: true });
   });
+  // A cardholder disputes an approved charge (a chargeback): the bank tells
+  // the merchant with a charge.disputed webhook. amount_kobo defaults to the
+  // whole charge.
+  sim.post('/disputes', (req, res) => {
+    const record = state.charges.get(String(req.body?.reference || ''));
+    if (!record || record.status !== 'APPROVED') return res.status(404).json({ error: 'no approved charge with that reference' });
+    const amount = Number.isSafeInteger(req.body?.amount_kobo) ? req.body.amount_kobo : record.amount_kobo;
+    sendWebhook('charge.disputed', {
+      reference: record.reference,
+      amount_kobo: amount,
+      bank_reference: record.bank_reference,
+      reason: String(req.body?.reason || 'cardholder disputes the charge').slice(0, 200),
+    });
+    res.status(202).json({ ok: true, reference: record.reference, amount_kobo: amount });
+  });
   app.use('/_sim', sim);
 
   // 503 mode fails a share of calls before doing any work.
@@ -107,22 +124,16 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     res.json(body);
   }
 
-  // Sends a signed webhook for a processed charge or transfer, a moment
-  // after the reply (so in timeout mode the webhook is our only answer).
-  function sendWebhook(type, record) {
+  // Sends a signed webhook, a moment after the reply (so in timeout mode
+  // the webhook is our only answer).
+  function sendWebhook(type, data) {
     const { webhook, webhookCopies } = state.mode;
     if (!webhookUrl || webhook === 'off') return;
     const raw = JSON.stringify({
       event_id: `evt_${name}_${crypto.randomBytes(8).toString('hex')}`,
       type,
       created_at: new Date().toISOString(),
-      data: {
-        reference: record.reference,
-        status: record.status,
-        response_code: record.response_code,
-        amount_kobo: record.amount_kobo,
-        bank_reference: record.bank_reference,
-      },
+      data,
     });
     const secret = webhook === 'bad_signature' ? 'definitely-not-the-shared-secret' : webhookSecret || '';
     const signature = `sha256=${crypto.createHmac('sha256', secret).update(raw).digest('hex')}`;
@@ -137,6 +148,15 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
       }, 50 + i * 30).unref();
     }
   }
+
+  // The outcome of a processed charge or transfer.
+  const resultData = (record) => ({
+    reference: record.reference,
+    status: record.status,
+    response_code: record.response_code,
+    amount_kobo: record.amount_kobo,
+    bank_reference: record.bank_reference,
+  });
 
   const bankRef = () => `${name}${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
 
@@ -167,7 +187,7 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     };
     state.charges.set(reference, record);
     reply(res, record);
-    sendWebhook(approved ? 'charge.completed' : 'charge.failed', record);
+    sendWebhook(approved ? 'charge.completed' : 'charge.failed', resultData(record));
   });
 
   // Transaction status query (TSQ) for a charge.
@@ -204,7 +224,7 @@ function createBank({ name, webhookUrl = null, webhookSecret = null }) {
     const record = { reference, account_number: accountNumber, amount_kobo: amount, status, response_code: code, bank_reference: bankRef() };
     state.transfers.set(reference, record);
     reply(res, record);
-    sendWebhook(status === 'SUCCESSFUL' ? 'transfer.completed' : 'transfer.failed', record);
+    sendWebhook(status === 'SUCCESSFUL' ? 'transfer.completed' : 'transfer.failed', resultData(record));
   });
 
   app.get('/transfers/:reference', (req, res) => {

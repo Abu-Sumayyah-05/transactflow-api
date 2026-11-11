@@ -4,6 +4,7 @@ const { pool } = require('../db/pool');
 const { AppError } = require('../errors');
 const processor = require('../webhooks/processor');
 const fraudReview = require('../fraud/review');
+const disputes = require('../disputes/disputes');
 const { idempotent } = require('../idempotency/idempotency');
 
 const router = express.Router();
@@ -50,6 +51,21 @@ router.post('/fraud/:id/decision', (req, res) =>
         idem
       ),
     { livePaymentResponse: (id) => require('../payments/routes').livePaymentResponse(id) }
+  )(req, res)
+);
+
+// Disputes (chargebacks): ?status=OPEN | CUSTOMER_WON | MERCHANT_WON (default: all)
+const DISPUTE_FILTERS = new Set(['OPEN', 'CUSTOMER_WON', 'MERCHANT_WON']);
+router.get('/disputes', async (req, res) => {
+  const status = req.query.status ? String(req.query.status).toUpperCase() : null;
+  if (status && !DISPUTE_FILTERS.has(status)) throw new AppError(400, 'INVALID_FILTER', `status must be one of ${[...DISPUTE_FILTERS].join(', ')}`);
+  res.json({ disputes: await disputes.list({ status }) });
+});
+
+// Resolving moves money out of ESCROW, so it needs an Idempotency-Key.
+router.post('/disputes/:id/resolve', (req, res) =>
+  idempotent(`POST /admin/disputes/${req.params.id}/resolve`, (r, idem) =>
+    disputes.resolve({ disputeId: Number(r.params.id), outcome: String(r.body?.outcome || '').toUpperCase(), adminId: r.user.id }, idem)
   )(req, res)
 );
 
