@@ -30,6 +30,7 @@ router.post(
           amountKobo: req.body?.amount_kobo,
           billingAddress: req.body?.billing_address,
           deviceId: fraud.parseDeviceId(req.get('X-Device-Id')),
+          startedAt: req.startedAt,
         },
         idem
       ),
@@ -44,7 +45,7 @@ router.post(
 router.post('/:id/challenge', (req, res) =>
   idempotent(
     `POST /payments/${req.params.id}/challenge`,
-    (r, idem) => service.completeChallenge({ userId: r.user.id, paymentId: r.params.id, otp: r.body?.otp }, idem),
+    (r, idem) => service.completeChallenge({ userId: r.user.id, paymentId: r.params.id, otp: r.body?.otp, startedAt: r.startedAt }, idem),
     { livePaymentResponse }
   )(req, res)
 );

@@ -85,6 +85,12 @@ router.post('/users/:id/role', async (req, res) => {
   res.json(updated.rows[0]);
 });
 
+// Live dashboard numbers: success rate, p99 latency, authorization rate by
+// bank. ?window=<minutes> (default 60) or ?since=<ISO time>.
+router.get('/metrics', async (req, res) => {
+  res.json(await require('../metrics/metrics').compute(req.query));
+});
+
 // Gateway health: circuit breaker state per bank (live dashboard).
 router.get('/gateway', (_req, res) => {
   res.json({ banks: require('../gateway/gateway').breakerSnapshots() });

@@ -19,6 +19,12 @@ app.use('/api/v1/webhooks', webhooks.router);
 
 app.use(express.json({ limit: '100kb' }));
 
+// When the request arrived, for the latency metrics (Module 10).
+app.use((req, _res, next) => {
+  req.startedAt = Date.now();
+  next();
+});
+
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 const v1 = express.Router();

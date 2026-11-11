@@ -23,9 +23,16 @@ async function walletOf(db, userId) {
   return rows[0].id;
 }
 
-async function finish(paymentId, result, idem) {
+// `timing` = { startedAt, bankMs }: how long the request and the bank call
+// took, saved for the latency metrics (Module 10).
+async function finish(paymentId, result, idem, timing) {
   return withTransaction(async (client) => {
     const final = await applyOutcome(client, paymentId, result);
+    await client.query('UPDATE payments SET bank_ms = $2, total_ms = $3 WHERE id = $1', [
+      paymentId,
+      timing.bankMs,
+      Date.now() - timing.startedAt,
+    ]);
     const body = repo.present(final);
     const status = final.status === 'UNKNOWN' ? 202 : 201;
     await idem.complete(client, status, body);
@@ -46,13 +53,14 @@ function pickBankOrFail() {
 // Sends a card payment that is PENDING with a bank chosen (and committed) to
 // that bank, then records the answer. Shared by the normal path, a passed
 // challenge and an admin approval.
-async function chargeAtBank(payment, ownerUserId, idem) {
+async function chargeAtBank(payment, ownerUserId, idem, startedAt = Date.now()) {
   // From here the bank may have the request. If anything below crashes, the
   // key must stay claimed so a retry can't create a second charge.
   idem.sideEffectsStarted();
   const card = await cardForCharge(pool, ownerUserId, payment.card_token);
+  const sentAt = Date.now();
   const result = await gateway.charge(payment.bank, { reference: payment.reference, amountKobo: payment.amount_kobo, card });
-  return finish(payment.id, result, idem);
+  return finish(payment.id, result, idem, { startedAt, bankMs: Date.now() - sentAt });
 }
 
 // POST /payments. Module 9 decides first, then the gateway (spec: "Runs fraud
@@ -60,7 +68,7 @@ async function chargeAtBank(payment, ownerUserId, idem) {
 //   APPROVE    PENDING -> bank, exactly as before
 //   CHALLENGE  PENDING with a one-time code; no bank, no charge until it's passed
 //   BLOCK      FAILED at once; never sent to a bank; OPEN in the fraud queue
-async function startCardTopup({ userId, cardToken, amountKobo, billingAddress, deviceId }, idem) {
+async function startCardTopup({ userId, cardToken, amountKobo, billingAddress, deviceId, startedAt = Date.now() }, idem) {
   assertKobo(amountKobo);
   const card = await cardOf(pool, userId, String(cardToken || ''));
   const billing = fraud.parseBillingAddress(billingAddress);
@@ -112,7 +120,7 @@ async function startCardTopup({ userId, cardToken, amountKobo, billingAddress, d
   });
 
   if (created.done) return created.done;
-  return chargeAtBank(created.send, userId, idem);
+  return chargeAtBank(created.send, userId, idem, startedAt);
 }
 
 // Locks a card payment that is waiting for its challenge. Only valid from
@@ -138,7 +146,7 @@ async function failChallenge(client, p, failureCode, challengeStatus, reason) {
 }
 
 // POST /payments/:id/challenge { otp }
-async function completeChallenge({ userId, paymentId, otp }, idem) {
+async function completeChallenge({ userId, paymentId, otp, startedAt = Date.now() }, idem) {
   if (!/^[0-9a-f-]{36}$/i.test(String(paymentId))) throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Payment not found');
   const step = await withTransaction(async (client) => {
     const p = await lockChallenged(client, paymentId, userId);
@@ -177,7 +185,7 @@ async function completeChallenge({ userId, paymentId, otp }, idem) {
   });
 
   if (step.done) return step.done;
-  return chargeAtBank(step.send, step.send.owner_id, idem);
+  return chargeAtBank(step.send, step.send.owner_id, idem, startedAt);
 }
 
 // Background job: challenges nobody finished in time are cancelled.
@@ -216,7 +224,7 @@ async function nameEnquiry(bank, accountNumber) {
   return ne.accountName;
 }
 
-async function startBankTransfer({ userId, bank, accountNumber, amountKobo }, idem) {
+async function startBankTransfer({ userId, bank, accountNumber, amountKobo, startedAt = Date.now() }, idem) {
   assertKobo(amountKobo);
   // Name enquiry first, so money is never held for an account that doesn't exist.
   const accountName = await nameEnquiry(bank, accountNumber);
@@ -249,8 +257,9 @@ async function startBankTransfer({ userId, bank, accountNumber, amountKobo }, id
   });
 
   idem.sideEffectsStarted();
+  const sentAt = Date.now();
   const result = await gateway.transfer(bank, { reference: payment.reference, accountNumber, amountKobo });
-  return finish(payment.id, result, idem);
+  return finish(payment.id, result, idem, { startedAt, bankMs: Date.now() - sentAt });
 }
 
 module.exports = {
