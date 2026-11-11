@@ -33,6 +33,17 @@ module.exports = {
   retryMaxAttempts: Number(process.env.RETRY_MAX_ATTEMPTS || 3),
   retryBaseMs: Number(process.env.RETRY_BASE_MS || 200),
   retryCapMs: Number(process.env.RETRY_CAP_MS || 2000),
+  // Module 9 velocity counters (card testing): attempts allowed per window.
+  velocityUserLimit: Number(process.env.VELOCITY_USER_LIMIT || 5),
+  velocityUserWindowSeconds: Number(process.env.VELOCITY_USER_WINDOW_SECONDS || 60),
+  velocityCardLimit: Number(process.env.VELOCITY_CARD_LIMIT || 5),
+  velocityCardWindowSeconds: Number(process.env.VELOCITY_CARD_WINDOW_SECONDS || 600),
+  // 3DS-style challenge: one-time code lifetime and tries. The code is shown
+  // in the API response only when this flag is on (demo and tests; a real
+  // issuer would send it to the cardholder's phone instead).
+  challengeTtlMs: Number(process.env.CHALLENGE_TTL_MS || 10 * 60 * 1000),
+  challengeMaxAttempts: Number(process.env.CHALLENGE_MAX_ATTEMPTS || 3),
+  challengeRevealOtp: process.env.CHALLENGE_REVEAL_OTP === 'true',
   // Webhooks: process right after receipt (tests turn this off and call
   // processDue themselves); retry with backoff; DLQ after max attempts.
   webhookInlineProcessing: process.env.WEBHOOK_INLINE_PROCESSING !== 'false',
