@@ -233,12 +233,16 @@ describe('block band and velocity (card testing)', () => {
   afterAll(() => Object.assign(config, saved));
 
   test('PHASE 6 CHECK: a card-testing burst is blocked', async () => {
-    // One account fires 8 payments at once, each on a different card.
+    // One account fires 8 payments at once, each on a different stolen card
+    // with its own billing address (so the "known address" discount can't
+    // apply, whatever order the requests finish in).
     const tester = await signUp();
     const cards = [];
     for (let i = 0; i < 8; i += 1) cards.push(await card(tester));
     const results = await Promise.all(
-      cards.map((c) => pay(tester, { card_token: c.token, amount_kobo: 100, billing_address: US_ADDRESS }, { device: 'device-cccc-3333' }))
+      cards.map((c, i) =>
+        pay(tester, { card_token: c.token, amount_kobo: 100, billing_address: { ...US_ADDRESS, line1: `${i + 1} Market St` } }, { device: 'device-cccc-3333' })
+      )
     );
 
     // Every response, so a failure shows exactly what came back.
@@ -262,6 +266,27 @@ describe('block band and velocity (card testing)', () => {
       expect(d.rules_fired.map((x) => x.rule)).toContain('velocity');
     }
     expect(await events(blocked[0].body.id)).toEqual(['INITIALIZED', 'FAILED']);
+  });
+
+  test('over the limit, nothing reaches a bank, even when discounts lower the score to a challenge', async () => {
+    // Same address on every attempt: once early ones complete, later ones get
+    // "known address" (-20) and "device seen", so 80 can drop to 60. Owner
+    // decision: velocity is additive. They are then challenged, not blocked,
+    // but still never charged without the one-time code.
+    const tester = await signUp();
+    const cards = [];
+    for (let i = 0; i < 8; i += 1) cards.push(await card(tester));
+    const body = (c) => ({ card_token: c.token, amount_kobo: 100, billing_address: US_ADDRESS });
+    const results = [];
+    for (const c of cards) results.push(await pay(tester, body(c), { device: 'device-dddd-4444' })); // one by one: deterministic
+
+    expect(results.map((r) => r.body.status)).toEqual([...Array(5).fill('COMPLETED'), ...Array(3).fill('PENDING')]);
+    expect(bank.state.calls.charge).toBe(5);
+    for (const r of results.slice(5)) {
+      const d = await decisionFor(r.body.id);
+      expect(d).toMatchObject({ score: 60, outcome: 'CHALLENGE', review_status: 'OPEN' });
+      expect(d.rules_fired.map((x) => x.rule).sort()).toEqual(['known_address', 'velocity']);
+    }
   });
 
   test('one card tried from many accounts is caught by the per-card counter', async () => {
