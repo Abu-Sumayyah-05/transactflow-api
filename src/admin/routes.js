@@ -69,6 +69,22 @@ router.post('/disputes/:id/resolve', (req, res) =>
   )(req, res)
 );
 
+// Make a customer a merchant (payouts are merchant-only) or back again.
+// The API can never create or demote an admin: that stays a database-level
+// operation, so a stolen admin token can't mint more admins. The new role
+// takes effect at the user's next login (the role travels in the JWT).
+const ASSIGNABLE_ROLES = new Set(['customer', 'merchant']);
+router.post('/users/:id/role', async (req, res) => {
+  const role = String(req.body?.role || '').toLowerCase();
+  if (!ASSIGNABLE_ROLES.has(role)) throw new AppError(400, 'INVALID_ROLE', 'role must be customer or merchant');
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) throw new AppError(404, 'USER_NOT_FOUND', 'No such user');
+  const { rows } = await pool.query('SELECT id, role FROM users WHERE id = $1', [req.params.id]);
+  if (!rows[0]) throw new AppError(404, 'USER_NOT_FOUND', 'No such user');
+  if (rows[0].role === 'admin') throw new AppError(409, 'CANNOT_CHANGE_ADMIN', 'Admin roles cannot be changed here');
+  const updated = await pool.query('UPDATE users SET role = $2 WHERE id = $1 RETURNING id, email, full_name, role', [req.params.id, role]);
+  res.json(updated.rows[0]);
+});
+
 // Gateway health: circuit breaker state per bank (live dashboard).
 router.get('/gateway', (_req, res) => {
   res.json({ banks: require('../gateway/gateway').breakerSnapshots() });
