@@ -32,7 +32,10 @@ describe('AES-256-GCM field encryption (Module 4)', () => {
     const b = encrypt('secret');
     expect(a).not.toBe(b);
     expect(decrypt(a)).toBe('secret');
-    const tampered = a.slice(0, -2) + (a.endsWith('A') ? 'B' : 'A') + a.slice(-1);
+    // Change one character of the ciphertext to a different one.
+    const victim = a[a.length - 2];
+    const tampered = a.slice(0, -2) + (victim === 'A' ? 'B' : 'A') + a.slice(-1);
+    expect(tampered).not.toBe(a);
     expect(() => decrypt(tampered)).toThrow();
   });
 
