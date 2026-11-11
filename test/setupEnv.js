@@ -26,3 +26,5 @@ process.env.RETRY_CAP_MS = '20';
 process.env.CHALLENGE_REVEAL_OTP = 'true';
 process.env.VELOCITY_USER_LIMIT = '1000';
 process.env.VELOCITY_CARD_LIMIT = '1000';
+// Reconciliation: no grace period, so tests control timing exactly.
+process.env.RECON_CUTOFF_GRACE_MS = '0';

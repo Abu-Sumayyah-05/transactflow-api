@@ -62,6 +62,13 @@ module.exports = {
   // worker process (npm run worker). WORKER_INLINE=true runs them inside the
   // API instead, for a one-process demo deployment.
   workerInline: process.env.WORKER_INLINE === 'true',
+  // Module 11 reconciliation. The worker runs it nightly at this hour (UTC).
+  reconHourUtc: Number(process.env.RECON_HOUR_UTC ?? 23),
+  // An item missing from the file but completed within this long before the
+  // cut-off is still treated as pending (bank and our clocks differ a little).
+  reconCutoffGraceMs: Number(process.env.RECON_CUTOFF_GRACE_MS ?? 60_000),
+  // Ignore payments from before this time (e.g. the day recon went live).
+  reconStart: process.env.RECON_START ? new Date(process.env.RECON_START) : null,
   // Webhooks: process right after receipt (tests turn this off and call
   // processDue themselves); retry with backoff; DLQ after max attempts.
   webhookInlineProcessing: process.env.WEBHOOK_INLINE_PROCESSING !== 'false',

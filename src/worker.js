@@ -4,7 +4,7 @@
 //   TSQ             asks banks about UNKNOWN payments; expires old challenges
 //   webhooks        retries bank events that failed to process (then the DLQ)
 //   payouts         sends payout batches, sub-batch by sub-batch
-//   (Phase 9 adds the reconciliation job)
+//   recon           nightly reconciliation against each bank's settlement file
 //
 // Run it with `npm run worker`, next to the API. Every job is safe to run in
 // more than one worker at once (each claims its rows with a lock or a
@@ -15,9 +15,10 @@ const tsq = require('./payments/tsq');
 const webhooks = require('./webhooks/processor');
 const payouts = require('./payouts/runner');
 const outbox = require('./outbox/outbox');
+const recon = require('./recon/engine');
 
 function start() {
-  return [outbox.startLoop(), tsq.startLoop(), webhooks.startLoop(), payouts.startLoop()];
+  return [outbox.startLoop(), tsq.startLoop(), webhooks.startLoop(), payouts.startLoop(), recon.startLoop()];
 }
 
 module.exports = { start };

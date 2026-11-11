@@ -5,6 +5,8 @@ const { AppError } = require('../errors');
 const processor = require('../webhooks/processor');
 const fraudReview = require('../fraud/review');
 const disputes = require('../disputes/disputes');
+const recon = require('../recon/engine');
+const reconReports = require('../recon/reports');
 const { idempotent } = require('../idempotency/idempotency');
 
 const router = express.Router();
@@ -83,6 +85,42 @@ router.post('/users/:id/role', async (req, res) => {
   if (rows[0].role === 'admin') throw new AppError(409, 'CANNOT_CHANGE_ADMIN', 'Admin roles cannot be changed here');
   const updated = await pool.query('UPDATE users SET role = $2 WHERE id = $1 RETURNING id, email, full_name, role', [req.params.id, role]);
   res.json(updated.rows[0]);
+});
+
+// ---- Reconciliation (Module 11) ---------------------------------------------
+// POST /admin/recon/run { bank, since?, file? }  manual run. `file` reconciles
+// a statement you supply; otherwise the bank is asked for today's.
+router.post('/recon/run', async (req, res) => {
+  const run = await recon.run({
+    bank: String(req.body?.bank || '').toUpperCase(),
+    fileText: typeof req.body?.file === 'string' ? req.body.file : null,
+    since: req.body?.since ?? null,
+    trigger: 'MANUAL',
+    actorId: req.user.id,
+  });
+  res.status(201).json(await recon.getRun(Number(run.id)));
+});
+router.get('/recon/runs', async (_req, res) => {
+  res.json({ runs: await recon.listRuns() });
+});
+router.get('/recon/runs/:id', async (req, res) => {
+  res.json(await recon.getRun(Number(req.params.id)));
+});
+// Open work by default (unresolved breaks + pending settlement). ?class=...&all=1
+router.get('/recon/items', async (req, res) => {
+  res.json({ items: await recon.listItems({ cls: req.query.class ? String(req.query.class).toUpperCase() : null, open: req.query.all !== '1' }) });
+});
+router.post('/recon/items/:id/resolve', async (req, res) => {
+  res.json(await recon.resolveItem({ itemId: Number(req.params.id), note: req.body?.note, actorId: req.user.id }));
+});
+// The four reports: summary, exceptions, outstanding, audit. ?run=<id>, ?format=csv
+router.get('/recon/reports/:name', async (req, res) => {
+  const report = await reconReports.build(req.params.name, { runId: req.query.run === undefined ? null : Number(req.query.run) });
+  if (req.query.format === 'csv') {
+    res.type('text/csv').attachment(`recon-${report.report}.csv`).send(reconReports.toCsv(report));
+    return;
+  }
+  res.json(report);
 });
 
 // Live dashboard numbers: success rate, p99 latency, authorization rate by

@@ -10,6 +10,10 @@ const sm = require('./stateMachine');
 const SETTLES_FROM = new Set(['PENDING', 'UNKNOWN']);
 
 async function settleSuccess(client, p, result) {
+  // What the bank itself said it moved, kept for reconciliation (Module 11).
+  if (Number.isSafeInteger(result.amountKobo)) {
+    await client.query('UPDATE payments SET gateway_amount_kobo = $2 WHERE id = $1', [p.id, result.amountKobo]);
+  }
   const set = { response_code: result.responseCode ?? null, bank_reference: result.bankReference ?? null, tsq_next_at: null };
   if (p.type === 'CARD_TOPUP') {
     // Bank approved the charge: it owes us the money; we owe the customer.

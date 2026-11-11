@@ -46,6 +46,7 @@ async function handleEvent(client, evt) {
     outcome: kind.outcome,
     responseCode: data.response_code ?? null,
     bankReference: data.bank_reference ?? null,
+    amountKobo: data.amount_kobo,
   });
 }
 
