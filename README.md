@@ -68,7 +68,8 @@ Mock bank modes are switched live with `POST /_sim/mode` on the bank (header `x-
 | 5. Resilience | Done | 503 mode opens Bank A's breaker and card traffic moves to Bank B; two simultaneous spends of one balance let only one through; 152 tests pass |
 | 6. Fraud and checkout | Done | Scores land in the right bands at every edge (0/40/41/79/80); an 8-attempt card-testing burst lets exactly 5 through and blocks 3, none of which reach a bank; 226 tests pass |
 | 7. Payouts | Done | A 250-item batch runs as 3 sub-batches (100, 100, 50) in order; after a crash mid-batch the rerun completes it and the bank processes each transfer exactly once; 278 tests pass |
-| 8. Outbox, worker and metrics | Awaiting approval | A process is killed (SIGKILL) after its database commit and before publishing; the relay still delivers the event to the Redis stream, exactly once; 290 tests pass |
+| 8. Outbox, worker and metrics | Done | A process is killed (SIGKILL) after its database commit and before publishing; the relay still delivers the event to the Redis stream, exactly once; 290 tests pass |
+| 9. Reconciliation | Awaiting approval | Each simulator settlement mode gives the expected classes (late items are PENDING_SETTLEMENT and settle on the next file; missing, wrong amount, duplicate and unknown items are classified breaks; a bad line is logged and flagged); a wrong closing balance halts the run; 336 tests pass |
 
 ### Design note for Phase 10
 
