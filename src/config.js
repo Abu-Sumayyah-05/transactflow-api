@@ -54,6 +54,14 @@ module.exports = {
   payoutMaxInFlight: Number(process.env.PAYOUT_MAX_IN_FLIGHT || 50),
   payoutLeaseSeconds: Number(process.env.PAYOUT_LEASE_SECONDS || 60),
   payoutIntervalMs: Number(process.env.PAYOUT_INTERVAL_MS || 2000),
+  // Module 10 outbox relay.
+  outboxBatchSize: Number(process.env.OUTBOX_BATCH_SIZE || 100),
+  outboxIntervalMs: Number(process.env.OUTBOX_INTERVAL_MS || 1000),
+  outboxStreamMaxLen: Number(process.env.OUTBOX_STREAM_MAXLEN || 10000),
+  // Background jobs (TSQ, webhook retries, payouts, outbox relay) live in the
+  // worker process (npm run worker). WORKER_INLINE=true runs them inside the
+  // API instead, for a one-process demo deployment.
+  workerInline: process.env.WORKER_INLINE === 'true',
   // Webhooks: process right after receipt (tests turn this off and call
   // processDue themselves); retry with backoff; DLQ after max attempts.
   webhookInlineProcessing: process.env.WEBHOOK_INLINE_PROCESSING !== 'false',

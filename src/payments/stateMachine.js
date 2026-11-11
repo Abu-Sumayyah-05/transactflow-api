@@ -8,6 +8,7 @@
 // COMPLETED and FAILED are final. The same list is enforced by a database
 // trigger (migration 003), so even a hand-written UPDATE can't break it.
 const { AppError } = require('../errors');
+const outbox = require('../outbox/outbox');
 
 const TRANSITIONS = Object.freeze({
   INITIALIZED: ['PENDING', 'FAILED'],
@@ -52,7 +53,21 @@ async function transition(client, paymentId, to, { reason = null, set = {} } = {
     'INSERT INTO payment_events (payment_id, from_status, to_status, reason) VALUES ($1, $2, $3, $4)',
     [paymentId, from, to, reason]
   );
-  return updated.rows[0];
+  // Outbox (Module 10): written with this client, so the event is in the
+  // same transaction as the status change above.
+  const p = updated.rows[0];
+  await outbox.add(client, `payment.${to.toLowerCase()}`, p.id, {
+    payment_id: p.id,
+    reference: p.reference,
+    type: p.type,
+    status: to,
+    from_status: from,
+    amount_kobo: p.amount_kobo,
+    bank: p.bank,
+    account_id: p.account_id,
+    reason,
+  });
+  return p;
 }
 
 module.exports = { TRANSITIONS, FINAL, canTransition, transition };
