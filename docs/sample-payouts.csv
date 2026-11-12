@@ -1,0 +1,5 @@
+bank,account_number,account_name,amount,reference
+A,0123456789,Ngozi Eze,1500.00,INV-0001
+B,0987654321,Funke Adeyemi,750.50,INV-0002
+A,0000000001,Wrong Person,300.00,INV-0003
+A,12345,Short Number,100.00,INV-0004
