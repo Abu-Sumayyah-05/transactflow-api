@@ -91,9 +91,47 @@ Use two browser windows side by side: the **customer** in one, the **admin** in 
 
 If there is time left: sign in as the merchant and upload [docs/sample-payouts.csv](docs/sample-payouts.csv) on the Payouts screen (two rows pay, one fails name enquiry, one fails the format check), or open the Fraud queue, Webhook log and Dead-letter queue.
 
-## Live deployment
+## Live deployment (Railway)
 
-Not deployed yet. The hosting choice is the owner's decision (spec rule 1); once made, the deployment steps and the live address go here.
+The live site is one Railway project with three services: the app (built from the [Dockerfile](Dockerfile)), PostgreSQL and Redis. The app container runs `scripts/demo.js`, so it applies migrations, creates the demo accounts and starts both mock banks, the API, the site and the background jobs in one process. Railway serves it over HTTPS (TLS), which the spec requires.
+
+One process is a demo-sized choice: it keeps the cost to a single small service. The code does not depend on it. The API, the worker and each bank can run as separate services with the commands under Development.
+
+```bash
+railway login                              # opens the browser
+railway init --name transactflow           # a new, empty project
+railway add --database postgres
+railway add --database redis
+railway add --service app
+railway link                               # choose the project, then the "app" service
+```
+
+Set the app's variables. The two `${{...}}` references tell Railway to fill in the database addresses itself, so no database password is ever typed or stored by hand. Generate each secret freshly: do not reuse the ones in your local `.env`.
+
+```bash
+railway variable set 'DATABASE_URL=${{Postgres.DATABASE_URL}}' --skip-deploys
+railway variable set 'REDIS_URL=${{Redis.REDIS_URL}}?family=0' --skip-deploys
+railway variable set TRUST_PROXY=1 SIM_TOKEN=<random> --skip-deploys
+railway variable set JWT_SECRET=<random, 96 hex characters> --skip-deploys
+railway variable set FIELD_ENCRYPTION_KEY=<random, 64 hex> CARD_FINGERPRINT_KEY=<random, 64 hex> --skip-deploys
+railway variable set WEBHOOK_SECRET_A=<random, 64 hex> WEBHOOK_SECRET_B=<random, 64 hex> --skip-deploys
+railway variable set DEMO_PASSWORD=<the password visitors will sign in with> --skip-deploys
+```
+
+Then deploy and give it a public address:
+
+```bash
+railway up                                 # builds the Dockerfile and deploys
+railway domain                             # creates the https://....up.railway.app address
+```
+
+Notes:
+
+- `?family=0` lets the Redis client find Redis on Railway's private network, which may answer on IPv6 only.
+- `TRUST_PROXY=1` tells Express there is one proxy (Railway's) in front of it, so the login rate limit counts each visitor separately.
+- `railway.json` tells Railway to build the Dockerfile and to treat the deploy as healthy once `GET /health` answers.
+- The demo shows the 3DS-style one-time code on screen. A real issuer would text it.
+- Anyone with the demo password can use the admin console, including the simulator switches. If a visitor leaves a bank in a failure mode, Simulator controls, Back to normal resets it.
 
 ## Development
 
