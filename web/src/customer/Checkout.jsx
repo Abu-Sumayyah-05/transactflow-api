@@ -13,7 +13,7 @@
 //                the backend finds out what the bank really did.
 import { useRef, useState } from 'react';
 import { api, nairaToKobo, newKey } from '../api.js';
-import { Field, Note, Page, useAction, useLoad } from '../ui.jsx';
+import { Field, Icon, Note, Page, useAction, useLoad } from '../ui.jsx';
 import PaymentStatus, { usePaymentPolling } from './PaymentStatus.jsx';
 
 const EMPTY_CARD = { number: '', exp_month: '', exp_year: '', cvv: '' };
@@ -175,7 +175,7 @@ export default function Checkout() {
           )}
           {useNew && (
             <div className="vault">
-              <div className="tag">Secure card vault</div>
+              <div className="tag"><Icon name="lock" size={14} />Secure card vault</div>
               <Field label="Card number">
                 <input className="mono" inputMode="numeric" autoComplete="cc-number" placeholder="4111 1111 1111 1111" value={card.number} onChange={(e) => setCard({ ...card, number: e.target.value })} required />
               </Field>

@@ -38,7 +38,7 @@ export default function PaymentStatus({ payment, onAgain, againLabel = 'Make ano
 
   const tone = payment.status === 'COMPLETED' ? 'good' : payment.status === 'FAILED' ? 'bad' : 'warn';
   return (
-    <div className="card stack" data-testid="payment-status">
+    <div className={`card stack outcome-${tone}`} data-testid="payment-status">
       <div className="row spread">
         <h2 style={{ margin: 0 }}>
           {payment.status === 'COMPLETED' ? 'Done' : payment.status === 'FAILED' ? 'Not completed' : `Confirming${dots}`}

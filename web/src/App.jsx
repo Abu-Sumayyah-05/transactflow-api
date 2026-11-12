@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { api, getToken, setToken, setUnauthorizedHandler } from './api.js';
-import { Badge } from './ui.jsx';
+import { Badge, Brand, Icon } from './ui.jsx';
 import { Session } from './session.js';
 import Login from './customer/Login.jsx';
 import Wallet from './customer/Wallet.jsx';
@@ -22,34 +22,39 @@ import DeadLetters from './admin/DeadLetters.jsx';
 import Simulator from './admin/Simulator.jsx';
 
 const link = ({ isActive }) => `nav${isActive ? ' active' : ''}`;
+// "Ada Admin" -> "AA", for the round avatar beside the name.
+const initials = (name) => String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 
 function Shell({ me, signOut, children }) {
   return (
     <div className="shell">
       <nav className="side" aria-label="Main">
-        <div className="brand">
-          Transact<span>Flow</span>
-        </div>
-        <NavLink className={link} to="/wallet">Wallet</NavLink>
-        <NavLink className={link} to="/checkout">Top up</NavLink>
-        <NavLink className={link} to="/transfer">Transfer</NavLink>
-        <NavLink className={link} to="/history">History</NavLink>
-        {me.role === 'merchant' && <NavLink className={link} to="/payouts">Payouts</NavLink>}
+        <Brand />
+        <NavLink className={link} to="/wallet"><Icon name="wallet" />Wallet</NavLink>
+        <NavLink className={link} to="/checkout"><Icon name="plus" />Top up</NavLink>
+        <NavLink className={link} to="/transfer"><Icon name="send" />Transfer</NavLink>
+        <NavLink className={link} to="/history"><Icon name="clock" />History</NavLink>
+        {me.role === 'merchant' && <NavLink className={link} to="/payouts"><Icon name="layers" />Payouts</NavLink>}
         {me.role === 'admin' && (
           <>
             <div className="section">Admin console</div>
-            <NavLink className={link} to="/admin/dashboard">Live dashboard</NavLink>
-            <NavLink className={link} to="/admin/fraud">Fraud queue</NavLink>
-            <NavLink className={link} to="/admin/recon">Reconciliation</NavLink>
-            <NavLink className={link} to="/admin/webhooks">Webhook log</NavLink>
-            <NavLink className={link} to="/admin/dlq">Dead-letter queue</NavLink>
-            <NavLink className={link} to="/admin/simulator">Simulator controls</NavLink>
+            <NavLink className={link} to="/admin/dashboard"><Icon name="pulse" />Live dashboard</NavLink>
+            <NavLink className={link} to="/admin/fraud"><Icon name="shield" />Fraud queue</NavLink>
+            <NavLink className={link} to="/admin/recon"><Icon name="scale" />Reconciliation</NavLink>
+            <NavLink className={link} to="/admin/webhooks"><Icon name="inbox" />Webhook log</NavLink>
+            <NavLink className={link} to="/admin/dlq"><Icon name="alert" />Dead-letter queue</NavLink>
+            <NavLink className={link} to="/admin/simulator"><Icon name="sliders" />Simulator controls</NavLink>
           </>
         )}
         <div className="who">
-          <div>{me.full_name}</div>
-          <div className="dim small">{me.email}</div>
-          <div className="row" style={{ marginTop: 8 }}>
+          <div className="id">
+            <div className="avatar" aria-hidden="true">{initials(me.full_name)}</div>
+            <div>
+              <div>{me.full_name}</div>
+              <div className="dim small">{me.email}</div>
+            </div>
+          </div>
+          <div className="row spread" style={{ marginTop: 12 }}>
             <Badge tone="info">{me.role}</Badge>
             <button className="sm ghost" onClick={signOut}>Sign out</button>
           </div>

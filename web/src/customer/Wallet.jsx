@@ -23,9 +23,9 @@ export default function Wallet() {
         </>
       }
     >
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card hero">
         <div className="row spread">
-          <span className="dim small">Available balance</span>
+          <span className="eyebrow">Available balance</span>
           <span>
             <span className="dim small">KYC </span>
             <Badge tone={KYC_TONE[account.kyc_status]}>{account.kyc_status}</Badge>
