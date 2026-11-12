@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
-require('./config');
+const config = require('./config');
 const { AppError } = require('./errors');
 const auth = require('./auth/auth');
 const accounts = require('./accounts/accounts');
@@ -14,6 +14,7 @@ const payouts = require('./payouts/routes');
 
 const app = express();
 app.disable('x-powered-by');
+if (config.trustProxy) app.set('trust proxy', config.trustProxy);
 
 // Webhooks first: their HMAC is checked over the raw bytes, so they must be
 // mounted BEFORE the JSON parser consumes the body.

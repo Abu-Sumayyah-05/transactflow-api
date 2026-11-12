@@ -62,6 +62,11 @@ module.exports = {
   // worker process (npm run worker). WORKER_INLINE=true runs them inside the
   // API instead, for a one-process demo deployment.
   workerInline: process.env.WORKER_INLINE === 'true',
+  // How many proxies sit in front of the app (0 locally, 1 on a host such as
+  // Railway). Express then reads the visitor's real IP address from the
+  // proxy's header, so the login rate limit counts per visitor instead of
+  // treating the whole internet as one person.
+  trustProxy: Number(process.env.TRUST_PROXY || 0),
   // Module 11 reconciliation. The worker runs it nightly at this hour (UTC).
   reconHourUtc: Number(process.env.RECON_HOUR_UTC ?? 23),
   // An item missing from the file but completed within this long before the
