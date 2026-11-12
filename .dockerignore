@@ -1,0 +1,11 @@
+# Never copied into the image: secrets, installed packages, tests and local output.
+.env
+.env.*
+.git
+node_modules
+web/node_modules
+web/dist
+e2e
+test
+coverage
+*.log
