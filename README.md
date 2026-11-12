@@ -42,7 +42,7 @@ flowchart TD
 You need [Node.js 20 or newer](https://nodejs.org) and [Docker Desktop](https://www.docker.com/products/docker-desktop/) (running).
 
 ```bash
-git clone <this repository> && cd Transact-flow
+git clone https://github.com/Abu-Sumayyah-05/transactflow-api.git && cd transactflow-api
 npm install
 npm --prefix web install
 cp .env.example .env        # then fill it in: see the table below
