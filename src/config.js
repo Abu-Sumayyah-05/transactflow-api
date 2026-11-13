@@ -63,7 +63,7 @@ module.exports = {
   // API instead, for a one-process demo deployment.
   workerInline: process.env.WORKER_INLINE === 'true',
   // How many proxies sit in front of the app (0 locally, 1 on a host such as
-  // Railway). Express then reads the visitor's real IP address from the
+  // Render). Express then reads the visitor's real IP address from the
   // proxy's header, so the login rate limit counts per visitor instead of
   // treating the whole internet as one person.
   trustProxy: Number(process.env.TRUST_PROXY || 0),

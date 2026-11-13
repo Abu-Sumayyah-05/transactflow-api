@@ -1,4 +1,4 @@
-# The live demo as one container (Phase 11). Railway builds this file.
+# The live demo as one container (Phase 11). Render builds this file.
 #
 # Two stages, so the finished image carries only what it needs to run:
 #   1. "web" builds the React site into static files.

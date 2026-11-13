@@ -1,0 +1,69 @@
+# Render Blueprint: the live demo (Phase 11).
+#
+# Render reads this file and creates three things, all on the free plan and
+# all in one region so they can talk over Render's private network:
+#   1. the app       (built from the Dockerfile; runs scripts/demo.js)
+#   2. PostgreSQL    (payments, ledger, outbox, audit log)
+#   3. Key Value     (Render's Redis: idempotency locks, velocity counters)
+#
+# No secret is written here. Render either generates the value itself
+# (generateValue) or asks for it once when the Blueprint is created
+# (sync: false).
+
+services:
+  - type: web
+    name: transactflow
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      # Render fills these two in from the services below, so no database
+      # password is ever typed or stored by hand.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: transactflow-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: transactflow-redis
+          property: connectionString
+      # One proxy (Render's) sits in front of the app.
+      - key: TRUST_PROXY
+        value: "1"
+      # Random strings: any value works, so Render generates them.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SIM_TOKEN
+        generateValue: true
+      - key: WEBHOOK_SECRET_A
+        generateValue: true
+      - key: WEBHOOK_SECRET_B
+        generateValue: true
+      # These two must be exactly 64 hex characters (32 bytes for AES-256),
+      # which Render's generator does not produce. Create each with:
+      #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false
+      - key: CARD_FINGERPRINT_KEY
+        sync: false
+      # The password visitors sign in with (at least 10 characters).
+      - key: DEMO_PASSWORD
+        sync: false
+
+  - type: keyvalue
+    name: transactflow-redis
+    plan: free
+    region: frankfurt
+    # Empty list: nothing on the public internet can connect. The app reaches
+    # it over the private network.
+    ipAllowList: []
+
+databases:
+  - name: transactflow-db
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "16"
