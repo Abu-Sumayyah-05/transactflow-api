@@ -91,45 +91,38 @@ Use two browser windows side by side: the **customer** in one, the **admin** in 
 
 If there is time left: sign in as the merchant and upload [docs/sample-payouts.csv](docs/sample-payouts.csv) on the Payouts screen (two rows pay, one fails name enquiry, one fails the format check), or open the Fraud queue, Webhook log and Dead-letter queue.
 
-## Live deployment (Railway)
+## Live deployment (Render)
 
-The live site is one Railway project with three services: the app (built from the [Dockerfile](Dockerfile)), PostgreSQL and Redis. The app container runs `scripts/demo.js`, so it applies migrations, creates the demo accounts and starts both mock banks, the API, the site and the background jobs in one process. Railway serves it over HTTPS (TLS), which the spec requires.
+The live site runs on [Render](https://render.com)'s free plan as three services in one region: the app (built from the [Dockerfile](Dockerfile)), PostgreSQL and Key Value (Render's Redis). The app container runs `scripts/demo.js`, so it applies migrations, creates the demo accounts and starts both mock banks, the API, the site and the background jobs in one process. Render serves it over HTTPS (TLS), which the spec requires.
 
-One process is a demo-sized choice: it keeps the cost to a single small service. The code does not depend on it. The API, the worker and each bank can run as separate services with the commands under Development.
+One process is a demo-sized choice: it fits a single free service. The code does not depend on it. The API, the worker and each bank can run as separate services with the commands under Development.
 
-```bash
-railway login                              # opens the browser
-railway init --name transactflow           # a new, empty project
-railway add --database postgres
-railway add --database redis
-railway add --service app
-railway link                               # choose the project, then the "app" service
-```
+[render.yaml](render.yaml) is a Render Blueprint: it describes all three services, so nothing is set up by hand except three values Render asks for.
 
-Set the app's variables. The two `${{...}}` references tell Railway to fill in the database addresses itself, so no database password is ever typed or stored by hand. Generate each secret freshly: do not reuse the ones in your local `.env`.
+1. Sign in at [dashboard.render.com](https://dashboard.render.com) with the GitHub account that owns the repository.
+2. Choose **New**, then **Blueprint**, and pick this repository. Render reads `render.yaml`.
+3. Fill in the three values it asks for. Generate the two keys freshly; do not reuse the ones in your local `.env`.
 
-```bash
-railway variable set 'DATABASE_URL=${{Postgres.DATABASE_URL}}' --skip-deploys
-railway variable set 'REDIS_URL=${{Redis.REDIS_URL}}?family=0' --skip-deploys
-railway variable set TRUST_PROXY=1 SIM_TOKEN=<random> --skip-deploys
-railway variable set JWT_SECRET=<random, 96 hex characters> --skip-deploys
-railway variable set FIELD_ENCRYPTION_KEY=<random, 64 hex> CARD_FINGERPRINT_KEY=<random, 64 hex> --skip-deploys
-railway variable set WEBHOOK_SECRET_A=<random, 64 hex> WEBHOOK_SECRET_B=<random, 64 hex> --skip-deploys
-railway variable set DEMO_PASSWORD=<the password visitors will sign in with> --skip-deploys
-```
+   | Value | What to enter |
+   |---|---|
+   | `FIELD_ENCRYPTION_KEY` | 64 hex characters: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+   | `CARD_FINGERPRINT_KEY` | Run the same command again for a second, different value |
+   | `DEMO_PASSWORD` | The password visitors sign in with (at least 10 characters) |
 
-Then deploy and give it a public address:
+4. Choose **Deploy Blueprint**. The first build takes a few minutes. The site address is on the `transactflow` service page (`https://....onrender.com`).
 
-```bash
-railway up                                 # builds the Dockerfile and deploys
-railway domain                             # creates the https://....up.railway.app address
-```
+After that, every push to `main` redeploys the site.
+
+What the free plan means:
+
+- **The site sleeps.** After 15 minutes with no visitor Render stops the app, and the next visit waits about a minute while it starts again. Background jobs (TSQ, outbox, nightly reconciliation) only run while it is awake.
+- **The free database expires 30 days after it is created**, and Render deletes it 14 days later unless it is upgraded. To keep the demo free, delete the database and sync the Blueprint again for a fresh one; the app recreates the tables and demo accounts on start. Everything visitors did is lost.
+- **Key Value keeps data in memory only**, and Render may restart it at any time. That is safe here: it holds idempotency locks and velocity counters, and idempotency keys are also stored in PostgreSQL.
 
 Notes:
 
-- `?family=0` lets the Redis client find Redis on Railway's private network, which may answer on IPv6 only.
-- `TRUST_PROXY=1` tells Express there is one proxy (Railway's) in front of it, so the login rate limit counts each visitor separately.
-- `railway.json` tells Railway to build the Dockerfile and to treat the deploy as healthy once `GET /health` answers.
+- `DATABASE_URL` and `REDIS_URL` are filled in by Render from the other two services, so no database password is ever typed or stored by hand. Render generates `JWT_SECRET`, `SIM_TOKEN` and the two webhook secrets itself.
+- `TRUST_PROXY=1` tells Express there is a proxy in front of it, so the login rate limit does not treat every visitor as one address.
 - The demo shows the 3DS-style one-time code on screen. A real issuer would text it.
 - Anyone with the demo password can use the admin console, including the simulator switches. If a visitor leaves a bank in a failure mode, Simulator controls, Back to normal resets it.
 
@@ -173,7 +166,7 @@ Mock bank modes are switched live with `POST /_sim/mode` on the bank (header `x-
 | 8. Outbox, worker and metrics | Done | A process is killed (SIGKILL) after its database commit and before publishing; the relay still delivers the event to the Redis stream, exactly once; 290 tests pass |
 | 9. Reconciliation | Done | Each simulator settlement mode gives the expected classes (late items are PENDING_SETTLEMENT and settle on the next file; missing, wrong amount, duplicate and unknown items are classified breaks; a bad line is logged and flagged); a wrong closing balance halts the run; 336 tests pass |
 | 10. Frontend | Done | Every screen in the site table works end to end: 15 browser tests drive the six customer screens and six admin screens against the real API, worker and both mock banks |
-| 11. Ship | In progress | Seed data, architecture diagram, demo script and one-command demo are done; the live deployment is waiting on the owner's choice of host |
+| 11. Ship | In progress | Seed data, architecture diagram, demo script and one-command demo are done; the Render Blueprint (render.yaml) is ready; the live deployment itself is still to be done |
 
 ## Design
 
