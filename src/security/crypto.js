@@ -7,9 +7,14 @@
 const crypto = require('crypto');
 
 function keyFromEnv(name) {
-  const hex = process.env[name];
-  if (!hex || !/^[0-9a-f]{64}$/i.test(hex)) {
-    throw new Error(`${name} must be 32 bytes as 64 hex characters (see .env.example)`);
+  // A key pasted into a host's settings box often carries a space or a line
+  // break. Those are never part of a hex key, so drop them from the ends.
+  const hex = (process.env[name] || '').trim();
+  if (!/^[0-9a-f]{64}$/i.test(hex)) {
+    // Say what is wrong (length, odd characters) but never print the key.
+    const notHex = hex.replace(/[0-9a-f]/gi, '').length;
+    const got = !hex ? 'it is not set' : `got ${hex.length} characters${notHex ? `, ${notHex} of them not 0-9 or a-f` : ''}`;
+    throw new Error(`${name} must be 32 bytes as 64 hex characters: ${got} (see .env.example)`);
   }
   return Buffer.from(hex, 'hex');
 }
