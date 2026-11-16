@@ -6,6 +6,8 @@ A full-stack payment platform. Customers pay and transfer money, and an operatio
 
 The build follows the *TransactFlow: Full-Stack Build Spec* (9 Nov 2026) in 11 phases. Each phase starts only after the previous phase's check passes and the owner approves.
 
+**Watch it: [docs/walkthrough.webm](docs/walkthrough.webm)**, a 5-minute captioned walkthrough of all twelve screens (download it to play).
+
 ## What it shows
 
 Five hard problems of payments, each one visible on the live site:
@@ -169,7 +171,7 @@ Mock bank modes are switched live with `POST /_sim/mode` on the bank (header `x-
 | 8. Outbox, worker and metrics | Done | A process is killed (SIGKILL) after its database commit and before publishing; the relay still delivers the event to the Redis stream, exactly once; 290 tests pass |
 | 9. Reconciliation | Done | Each simulator settlement mode gives the expected classes (late items are PENDING_SETTLEMENT and settle on the next file; missing, wrong amount, duplicate and unknown items are classified breaks; a bad line is logged and flagged); a wrong closing balance halts the run; 336 tests pass |
 | 10. Frontend | Done | Every screen in the site table works end to end: 15 browser tests drive the six customer screens and six admin screens against the real API, worker and both mock banks |
-| 11. Ship | In progress | Seed data, architecture diagram, demo script and one-command demo are done; the site is live on Render (address at the top); a recorded walkthrough of every screen is made with `npm run video`; the owner's check of the demo on the live site is still to be done |
+| 11. Ship | Done | Seed data, architecture diagram, demo script and one-command demo; the site is live on Render (address at the top); a recorded walkthrough of every screen is in [docs/walkthrough.webm](docs/walkthrough.webm) |
 
 ## Where the code differs from the spec
 
