@@ -147,6 +147,7 @@ npm run web:dev             # React site on http://localhost:5173 with live relo
 ```bash
 npm test                    # every backend test, against the separate transactflow_test database
 npm run e2e                 # builds the site, starts the whole stack, drives a real browser through all 12 screens
+npm run video               # records a captioned walkthrough of all 12 screens to docs/walkthrough.webm (about 5 minutes)
 ```
 
 Both use the test database and Redis db 1, so development data is never touched. The browser tests use the Microsoft Edge already installed on Windows; set `PW_CHANNEL=chrome` to use Chrome.
@@ -168,7 +169,11 @@ Mock bank modes are switched live with `POST /_sim/mode` on the bank (header `x-
 | 8. Outbox, worker and metrics | Done | A process is killed (SIGKILL) after its database commit and before publishing; the relay still delivers the event to the Redis stream, exactly once; 290 tests pass |
 | 9. Reconciliation | Done | Each simulator settlement mode gives the expected classes (late items are PENDING_SETTLEMENT and settle on the next file; missing, wrong amount, duplicate and unknown items are classified breaks; a bad line is logged and flagged); a wrong closing balance halts the run; 336 tests pass |
 | 10. Frontend | Done | Every screen in the site table works end to end: 15 browser tests drive the six customer screens and six admin screens against the real API, worker and both mock banks |
-| 11. Ship | In progress | Seed data, architecture diagram, demo script and one-command demo are done; the Render Blueprint (render.yaml) is ready; the live deployment itself is still to be done |
+| 11. Ship | In progress | Seed data, architecture diagram, demo script and one-command demo are done; the site is live on Render (address at the top); a recorded walkthrough of every screen is made with `npm run video`; the owner's check of the demo on the live site is still to be done |
+
+## Where the code differs from the spec
+
+**Row lock on balances.** The spec says to lock the row with `SELECT ... FOR UPDATE` when changing a balance. The code uses `SELECT ... FOR NO KEY UPDATE` ([src/ledger/ledger.js](src/ledger/ledger.js)). Both make two spends of one balance wait their turn, which is what the rule is for, and the concurrency test proves it. The difference: plain `FOR UPDATE` also blocks the light lock PostgreSQL takes on an account whenever a row pointing at it (a payment, a ledger entry) is written, and with payouts and transfers running at once that caused deadlocks. Switching back to plain `FOR UPDATE` was tried again on 16 Nov 2026 and the payout and lock-order tests failed with `deadlock detected` on every run, so `FOR NO KEY UPDATE` stays. It is the same lock an `UPDATE` of the balance takes anyway.
 
 ## Design
 
