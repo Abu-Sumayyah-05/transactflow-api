@@ -2,7 +2,7 @@
 
 A full-stack payment platform. Customers pay and transfer money, and an operations team monitors, reconciles and blocks risky activity. The backend covers one main idea from each of Modules 1 to 11 of the fintech course.
 
-**Live site: <https://transactflow.onrender.com>** (free plan: if nobody has visited for 15 minutes, the first page takes about a minute to load).
+**Live site: <https://transactflow.onrender.com>** (free plan: it sleeps after 15 minutes without a visitor; a [scheduled GitHub job](.github/workflows/keep-alive.yml) asks its health page every 5 minutes to keep it awake, but if it has slept anyway the first page takes about a minute to load).
 
 The build follows the *TransactFlow: Full-Stack Build Spec* (9 Nov 2026) in 11 phases. Each phase starts only after the previous phase's check passes and the owner approves.
 
