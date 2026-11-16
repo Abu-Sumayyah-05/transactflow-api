@@ -17,7 +17,8 @@
     "bank:b": "node mockbank/server.js B",
     "web:dev": "npm --prefix web run dev",
     "web:build": "npm --prefix web run build",
-    "e2e": "npm --prefix web run build && playwright test"
+    "e2e": "npm --prefix web run build && playwright test",
+    "video": "npm --prefix web run build && playwright test --config playwright.video.config.js"
   },
   "jest": {
     "testEnvironment": "node",
