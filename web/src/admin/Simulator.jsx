@@ -142,7 +142,7 @@ function Bank({ bank, initial, reachable, onSaved }) {
         <label>Next settlement file (for reconciliation)</label>
         <div className="grid cols-2">
           {FAULTS.map(([k, l]) => (
-            <label key={k} className="row" style={{ color: 'var(--bone)', margin: 0 }}>
+            <label key={k} className="row" style={{ color: 'var(--ink)', margin: 0 }}>
               <input
                 type="checkbox"
                 checked={Boolean(m.settlement[k])}

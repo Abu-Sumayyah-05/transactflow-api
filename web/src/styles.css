@@ -1,32 +1,39 @@
-/* Night Market: the owner-approved look (Phase 10), polished in Phase 11.
-   Headings  Bricolage Grotesque     Body  Instrument Sans     Amounts  JetBrains Mono
+/* Noir & Or: black and gold (replaces Ledger Noir, Nov 2026).
+   A private-bank statement: deep warm black, champagne ink, and one metal,
+   gold, for the brand and anything you can act on. Status colours
+   (ok / warn / bad) appear only on statuses; warn is copper, not gold, so a
+   warning never reads as a button.
+
+   Headlines, balances  Cormorant Garamond     Body  Manrope     Figures  DM Mono
+
    Every colour used anywhere is one of these tokens, or a tint mixed from
-   one with color-mix(). Black is used only for shadows. */
+   one with color-mix(). Generated content ('::before'/'::after') stays
+   empty on links, buttons and labels: the browser tests find those by
+   their accessible names. */
 :root {
-  --indigo-0: #0f0d22; /* wells: inputs, progress tracks */
-  --indigo: #14122b; /* page background */
-  --indigo-2: #1d1a3d; /* cards */
-  --indigo-3: #2a2656; /* raised: hover */
-  --line: #3a3570;
-  --bone: #f4efe6; /* text */
-  --bone-dim: #b9b3c9; /* secondary text */
-  --coral: #ff5a45; /* primary action */
-  --coral-deep: #e2432f;
-  --lilac: #b9a7ff; /* links, info */
-  --lime: #c6f24e; /* success */
-  --amber: #ffb020; /* pending, warnings */
-  --rose: #ff8d8d; /* errors on dark */
+  --black: #070605;
+  --well: #0b0a08; /* inputs, progress tracks */
+  --surface: #100e0b; /* cards */
+  --raised: #1a1712; /* hover */
+  --rule: #241f17; /* hairlines */
+  --rule-strong: #3b3324; /* control borders */
+  --ink: #f4ecdb; /* text, champagne */
+  --ink-dim: #a69c86; /* secondary text */
+  --ink-faint: #6e6552; /* labels, numbering */
+  --gold: #d8b36a; /* primary action, the one accent */
+  --gold-bright: #f0d48e;
+  --gold-deep: #9a7433;
+  /* Brushed metal: used for fills and gilded text. */
+  --gilt: linear-gradient(135deg, #f6e2a8 0%, #d8b36a 38%, #a97d36 62%, #e9cb83 100%);
+  --ok: #7fd3a1; /* jade */
+  --warn: #ee8f4f; /* copper */
+  --bad: #ff6b6b;
 
-  --display: 'Bricolage Grotesque', sans-serif;
-  --body: 'Instrument Sans', sans-serif;
-  --mono: 'JetBrains Mono', monospace;
-  --radius: 18px;
-  --radius-sm: 12px;
-
-  /* Derived surfaces, so every card, input and shadow agrees. */
-  --hairline: color-mix(in srgb, var(--line) 65%, transparent);
-  --card-bg: linear-gradient(180deg, color-mix(in srgb, var(--indigo-3) 45%, var(--indigo-2)) 0%, var(--indigo-2) 60%);
-  --card-shadow: inset 0 1px 0 color-mix(in srgb, var(--bone) 7%, transparent), 0 24px 48px -28px rgba(0, 0, 0, 0.75);
+  --serif: 'Cormorant Garamond', 'Times New Roman', serif;
+  --body: 'Manrope', system-ui, sans-serif;
+  --mono: 'DM Mono', ui-monospace, monospace;
+  --radius: 10px;
+  --radius-sm: 6px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
@@ -40,54 +47,71 @@ body,
 }
 html {
   color-scheme: dark;
-  scrollbar-color: var(--line) transparent;
+  scrollbar-color: var(--rule-strong) var(--black);
 }
 body {
   margin: 0;
-  /* Two soft lamps, coral above and lilac below, that stay put as the page scrolls. */
+  /* A faint dot grid, like graph paper, under one warm lamp at the top right. */
   background:
-    radial-gradient(900px 520px at 88% -8%, color-mix(in srgb, var(--coral) 13%, transparent), transparent 70%),
-    radial-gradient(820px 620px at -8% 105%, color-mix(in srgb, var(--lilac) 13%, transparent), transparent 70%),
-    var(--indigo);
+    radial-gradient(1100px 600px at 100% -10%, color-mix(in srgb, var(--gold) 7%, transparent), transparent 70%),
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ink) 7%, transparent) 1px, transparent 1.4px) 0 0 / 22px 22px,
+    var(--black);
   background-attachment: fixed;
-  color: var(--bone);
+  color: var(--ink);
   font-family: var(--body);
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 ::selection {
-  background: color-mix(in srgb, var(--coral) 55%, transparent);
-  color: var(--bone);
+  background: var(--gold-bright);
+  color: var(--black);
 }
 h1,
-h2,
-h3 {
-  font-family: var(--display);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+h2 {
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
   margin: 0 0 0.5em;
   text-wrap: balance;
 }
 h1 {
-  font-size: clamp(1.9rem, 1.4rem + 1.6vw, 2.6rem);
-  font-weight: 800;
-  letter-spacing: -0.035em;
+  font-size: clamp(2.7rem, 1.8rem + 2.6vw, 4rem);
+  letter-spacing: -0.02em;
 }
 h2 {
-  font-size: 1.25rem;
+  font-size: 1.95rem;
+}
+/* Gilded text: the gold gradient clipped to the letters. */
+.gilt,
+h1 em,
+h2 em {
+  background: var(--gilt);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 h3 {
-  font-size: 1rem;
+  font-family: var(--body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 0 0 0.5em;
 }
 p {
   margin: 0 0 1em;
 }
 a {
-  color: var(--lilac);
-  text-underline-offset: 3px;
+  color: var(--ink);
+  text-decoration-color: var(--gold);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  transition: color 0.15s var(--ease);
+}
+a:hover {
+  color: var(--gold-bright);
 }
 .mono,
 .amount {
@@ -95,16 +119,16 @@ a {
   font-variant-numeric: tabular-nums;
 }
 .dim {
-  color: var(--bone-dim);
+  color: var(--ink-dim);
 }
 .small {
-  font-size: 0.85rem;
+  font-size: 0.84rem;
 }
 
 /* ---- layout ------------------------------------------------------------ */
 .shell {
   display: grid;
-  grid-template-columns: 252px 1fr;
+  grid-template-columns: 248px 1fr;
   min-height: 100%;
 }
 .side {
@@ -112,94 +136,111 @@ a {
   top: 0;
   height: 100vh;
   overflow-y: auto;
-  background: color-mix(in srgb, var(--indigo-2) 72%, transparent);
-  backdrop-filter: blur(18px);
-  border-right: 1px solid var(--hairline);
-  padding: 24px 14px 18px;
+  background: var(--black);
+  border-right: 1px solid var(--rule);
+  padding: 26px 0 18px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 1px;
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: 1.3rem;
-  letter-spacing: -0.03em;
-  padding: 0 10px 22px;
+  gap: 11px;
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 1.08rem;
+  letter-spacing: 0.02em;
+  padding: 0 22px 26px;
 }
+/* "Flow" set in the serif italic: the wordmark's one flourish. */
 .brand span {
-  color: var(--coral);
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.42em;
+  letter-spacing: 0;
+  background: var(--gilt);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-right: 0.08em;
 }
 .brand .mark {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   flex: none;
-  border-radius: 10px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
-  color: var(--indigo);
-  background: linear-gradient(135deg, var(--coral) 10%, var(--amber) 120%);
-  box-shadow: 0 8px 20px -8px var(--coral);
+  color: var(--black);
+  background: var(--gilt);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.45),
+    0 0 0 1px var(--gold-deep),
+    0 6px 22px -6px color-mix(in srgb, var(--gold) 60%, transparent);
 }
 .side .section {
-  margin: 18px 12px 6px;
-  font-size: 0.68rem;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 22px 8px;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: color-mix(in srgb, var(--bone-dim) 75%, transparent);
+  letter-spacing: 0.16em;
+  color: var(--ink-faint);
+}
+.side .section::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
 }
 .side a.nav {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 9px 12px;
-  border-radius: 11px;
-  color: var(--bone-dim);
+  gap: 12px;
+  margin: 0 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-dim);
   text-decoration: none;
   font-weight: 500;
   transition: background 0.18s var(--ease), color 0.18s var(--ease);
 }
 .side a.nav svg {
   flex: none;
-  opacity: 0.8;
-  transition: transform 0.18s var(--ease);
+  opacity: 0.7;
 }
 .side a.nav:hover {
-  background: color-mix(in srgb, var(--indigo-3) 70%, transparent);
-  color: var(--bone);
-}
-.side a.nav:hover svg {
-  transform: translateX(1px);
+  background: var(--raised);
+  color: var(--ink);
 }
 .side a.nav.active {
-  background: color-mix(in srgb, var(--coral) 15%, transparent);
-  color: var(--bone);
-  font-weight: 600;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--coral) 28%, transparent);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--rule);
 }
 .side a.nav.active svg {
-  color: var(--coral);
+  color: var(--gold);
   opacity: 1;
 }
 .side a.nav.active::before {
   content: '';
   position: absolute;
-  left: -14px;
-  top: 9px;
-  bottom: 9px;
-  width: 4px;
-  border-radius: 0 4px 4px 0;
-  background: var(--coral);
+  left: -10px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--gold);
 }
 .side .who {
-  margin-top: auto;
-  padding: 14px 8px 0;
-  border-top: 1px solid var(--hairline);
+  margin: auto 10px 0;
+  padding: 16px 12px 0;
+  border-top: 1px solid var(--rule);
   font-size: 0.85rem;
 }
 .who .id {
@@ -217,28 +258,30 @@ a {
   white-space: nowrap;
 }
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   flex: none;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: var(--indigo);
-  background: linear-gradient(135deg, var(--lilac), var(--coral));
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.2rem;
+  color: var(--gold-bright);
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
 }
 .main {
-  padding: 40px 44px 72px;
-  max-width: 1200px;
+  padding: 44px 52px 80px;
+  max-width: 1220px;
   width: 100%;
   min-width: 0;
 }
 /* Each screen eases in when it opens. Live refreshes do not replay it,
    because React keeps the same elements on the page. */
 .main > * {
-  animation: rise 0.42s var(--ease) both;
+  animation: rise 0.45s var(--ease) both;
 }
 .main > *:nth-child(2) {
   animation-delay: 0.05s;
@@ -252,30 +295,43 @@ a {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
 }
+/* The page title sits on a ruled line, like the head of a ledger page. */
 .head {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 26px;
+  margin-bottom: 30px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--rule);
   flex-wrap: wrap;
+  position: relative;
+}
+.head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 56px;
+  height: 1px;
+  background: var(--gold);
 }
 .head h1 {
-  margin-bottom: 0.2em;
+  margin-bottom: 0.12em;
 }
 .head p {
   margin: 0;
 }
 .main > h2 {
-  margin-top: 30px;
-  margin-bottom: 12px;
+  margin-top: 40px;
+  margin-bottom: 14px;
 }
 .grid {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 .cols-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -301,99 +357,95 @@ a {
 
 /* ---- pieces ------------------------------------------------------------ */
 .card {
-  background: var(--card-bg);
-  border: 1px solid var(--hairline);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--gold) 4%, transparent), transparent 120px),
+    var(--surface);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--gold) 10%, transparent);
+  border: 1px solid var(--rule);
   border-radius: var(--radius);
   padding: 22px;
-  box-shadow: var(--card-shadow);
 }
 .card.flush {
   padding: 0;
   overflow: hidden;
 }
-.stat .label {
-  font-size: 0.7rem;
-  font-weight: 600;
+.card h2 {
+  font-size: 1.45rem;
+}
+.stat .label,
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--bone-dim);
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
 }
 .stat .value {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 1.85rem;
+  font-family: var(--serif);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-size: 2.5rem;
   font-weight: 600;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.01em;
   line-height: 1.2;
-  margin: 6px 0 4px;
+  margin: 10px 0 4px;
 }
 .card.stat {
   position: relative;
   overflow: hidden;
 }
-/* A thin lit edge along the top of each headline number. */
+/* A short signal tick on the top edge of each headline number. */
 .card.stat::before {
   content: '';
   position: absolute;
-  inset: 0 0 auto 0;
+  left: 22px;
+  top: 0;
+  width: 18px;
   height: 2px;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lilac) 70%, transparent), transparent);
+  background: var(--gold);
 }
 .balance {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-size: clamp(2.2rem, 1.4rem + 3vw, 3.4rem);
+  font-family: var(--serif);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-size: clamp(3.4rem, 1.8rem + 5.4vw, 6.2rem);
   font-weight: 600;
-  letter-spacing: -0.04em;
-  line-height: 1.15;
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 
-/* The wallet's balance card: the one place the palette is allowed to glow. */
+/* The wallet's balance card: ruled like ledger paper, with one margin line
+   in the accent. */
 .card.hero {
   position: relative;
   overflow: hidden;
-  padding: 28px 30px 30px;
-  border-color: color-mix(in srgb, var(--coral) 30%, var(--line));
+  padding: 28px 32px 34px 48px;
   background:
-    radial-gradient(520px 260px at 100% 0%, color-mix(in srgb, var(--coral) 34%, transparent), transparent 70%),
-    radial-gradient(460px 280px at 0% 120%, color-mix(in srgb, var(--lilac) 26%, transparent), transparent 70%),
-    var(--indigo-2);
-}
-.card.hero::after {
-  /* Fine concentric rings, like ripples from a dropped coin. Decorative. */
-  content: '';
-  position: absolute;
-  right: -140px;
-  top: -140px;
-  width: 440px;
-  height: 440px;
-  border-radius: 50%;
-  background: repeating-radial-gradient(circle, transparent 0 27px, color-mix(in srgb, var(--bone) 9%, transparent) 27px 28px);
-  mask-image: radial-gradient(circle, #000 20%, transparent 70%);
-  pointer-events: none;
+    linear-gradient(90deg, transparent 27px, color-mix(in srgb, var(--gold) 55%, transparent) 27px 28px, transparent 28px),
+    repeating-linear-gradient(180deg, transparent 0 31px, color-mix(in srgb, var(--ink) 5%, transparent) 31px 32px),
+    radial-gradient(600px 260px at 100% 0%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 70%),
+    var(--surface);
+  border-color: var(--rule-strong);
 }
 .card.hero > * {
   position: relative;
   z-index: 1;
 }
 .card.hero .balance {
-  margin-top: 10px;
-}
-.eyebrow {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--bone-dim);
+  margin-top: 22px;
+  background: var(--gilt);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 6px 30px color-mix(in srgb, var(--gold) 22%, transparent));
 }
 
 button,
 .btn {
   font: inherit;
-  font-weight: 600;
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--indigo-3) 80%, transparent);
-  color: var(--bone);
+  font-weight: 500;
+  border: 1px solid var(--rule-strong);
+  background: var(--black);
+  color: var(--ink);
   padding: 10px 18px;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -406,62 +458,84 @@ button,
     transform 0.15s var(--ease),
     background 0.15s var(--ease),
     border-color 0.15s var(--ease),
-    box-shadow 0.15s var(--ease);
+    color 0.15s var(--ease);
 }
 button:hover:not(:disabled),
 .btn:hover {
-  border-color: var(--lilac);
-  transform: translateY(-1px);
+  border-color: var(--gold);
+  color: var(--gold-bright);
 }
 button:active:not(:disabled),
 .btn:active {
-  transform: translateY(0) scale(0.985);
+  transform: scale(0.985);
 }
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 button.primary,
 .btn.primary {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--coral) 86%, var(--bone)) 0%, var(--coral) 55%, var(--coral-deep) 130%);
-  border-color: transparent;
-  color: var(--indigo);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--bone) 35%, transparent),
-    0 10px 24px -10px var(--coral);
+  background: var(--gilt);
+  background-size: 160% 160%;
+  background-position: 0% 50%;
+  border-color: var(--gold-deep);
+  color: var(--black);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
+  transition:
+    transform 0.15s var(--ease),
+    background-position 0.5s var(--ease),
+    box-shadow 0.2s var(--ease);
 }
 button.primary:hover:not(:disabled),
 .btn.primary:hover {
-  border-color: transparent;
+  background: var(--gilt);
+  background-size: 160% 160%;
+  background-position: 100% 50%;
+  border-color: var(--gold);
+  color: var(--black);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--bone) 35%, transparent),
-    0 14px 30px -10px var(--coral);
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    0 8px 28px -8px color-mix(in srgb, var(--gold) 70%, transparent);
 }
 button.good {
-  background: var(--lime);
-  border-color: transparent;
-  color: var(--indigo);
-  box-shadow: 0 10px 24px -12px var(--lime);
+  background: var(--ok);
+  border-color: var(--ok);
+  color: var(--black);
+  font-weight: 600;
+}
+button.good:hover:not(:disabled) {
+  border-color: var(--ok);
+  color: var(--black);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 18%, transparent);
 }
 button.ghost {
   background: transparent;
+  border-color: transparent;
+  color: var(--ink-dim);
+}
+button.ghost:hover:not(:disabled) {
+  border-color: var(--rule-strong);
 }
 button.on {
-  background: var(--lilac);
-  border-color: var(--lilac);
-  color: var(--indigo);
+  background: var(--gilt);
+  border-color: var(--gold-deep);
+  color: var(--black);
+}
+button.on:hover:not(:disabled) {
+  color: var(--black);
 }
 button.sm {
   padding: 5px 11px;
-  font-size: 0.85rem;
-  border-radius: 9px;
+  font-size: 0.84rem;
 }
 
 label {
   display: block;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 500;
-  color: var(--bone-dim);
+  color: var(--ink-dim);
   margin-bottom: 5px;
 }
 input,
@@ -469,9 +543,9 @@ select,
 textarea {
   font: inherit;
   width: 100%;
-  background: var(--indigo-0);
-  border: 1px solid var(--line);
-  color: var(--bone);
+  background: var(--well);
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
   border-radius: var(--radius-sm);
   padding: 11px 13px;
   transition:
@@ -480,54 +554,54 @@ textarea {
 }
 input::placeholder,
 textarea::placeholder {
-  color: color-mix(in srgb, var(--bone-dim) 55%, transparent);
+  color: var(--ink-faint);
 }
 input:hover,
 select:hover,
 textarea:hover {
-  border-color: color-mix(in srgb, var(--lilac) 45%, var(--line));
+  border-color: color-mix(in srgb, var(--ink) 35%, var(--rule-strong));
 }
 input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: var(--lilac);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--lilac) 22%, transparent);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 20%, transparent);
 }
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--lilac);
+  outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
 select {
   appearance: none;
   padding-right: 38px;
-  /* The arrow is drawn in --bone-dim (#b9b3c9). */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%23b9b3c9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+  /* The arrow is drawn in --ink-dim (#8d8c86). */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%238d8c86' stroke-width='1.8' stroke-linecap='square'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
 }
 textarea {
   font-family: var(--mono);
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   min-height: 150px;
 }
 input[type='checkbox'] {
   width: auto;
-  accent-color: var(--coral);
+  accent-color: var(--gold);
 }
 input[type='file'] {
   padding: 8px;
 }
 input[type='file']::file-selector-button {
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   margin-right: 12px;
   padding: 6px 12px;
-  border-radius: 9px;
-  border: 1px solid var(--line);
-  background: var(--indigo-3);
-  color: var(--bone);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule-strong);
+  background: var(--raised);
+  color: var(--ink);
   cursor: pointer;
 }
 .field + .field {
@@ -545,128 +619,132 @@ input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 select:-webkit-autofill,
 textarea:-webkit-autofill {
-  -webkit-text-fill-color: var(--bone);
-  -webkit-box-shadow: 0 0 0 1000px var(--indigo-0) inset;
-  box-shadow: 0 0 0 1000px var(--indigo-0) inset;
-  caret-color: var(--bone);
+  -webkit-text-fill-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--well) inset;
+  box-shadow: 0 0 0 1000px var(--well) inset;
+  caret-color: var(--ink);
   transition: background-color 9999s ease-out;
 }
 input:autofill {
-  -webkit-text-fill-color: var(--bone);
-  box-shadow: 0 0 0 1000px var(--indigo-0) inset;
+  -webkit-text-fill-color: var(--ink);
+  box-shadow: 0 0 0 1000px var(--well) inset;
 }
 /* The card form: visually a separate, sealed box (hosted-fields style). */
 .vault {
-  border: 1px dashed color-mix(in srgb, var(--lilac) 70%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--gold) 55%, transparent);
   border-radius: var(--radius);
   padding: 18px;
-  background: color-mix(in srgb, var(--lilac) 6%, transparent);
+  background:
+    repeating-linear-gradient(135deg, transparent 0 9px, color-mix(in srgb, var(--gold) 3%, transparent) 9px 10px),
+    var(--black);
 }
 .vault .tag {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--lilac);
+  letter-spacing: 0.14em;
+  color: var(--gold);
   margin-bottom: 12px;
 }
 
+/* Status tags: square, mono, like a rubber stamp. */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-family: var(--mono);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  padding: 3px 10px 3px 8px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  padding: 2px 8px 2px 7px;
+  border-radius: 2px;
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  background: color-mix(in srgb, currentColor 9%, transparent);
   white-space: nowrap;
   vertical-align: middle;
 }
 .badge::before {
   content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  width: 5px;
+  height: 5px;
   background: currentColor;
 }
 .badge.good {
-  color: var(--lime);
+  color: var(--ok);
 }
 .badge.warn {
-  color: var(--amber);
+  color: var(--warn);
 }
-/* Anything still in flight breathes, so "not final yet" is visible at a glance. */
+/* Anything still in flight blinks, so "not final yet" is visible at a glance. */
 .badge.warn::before {
-  animation: pulse 1.6s ease-in-out infinite;
+  animation: pulse 1.4s steps(2, jump-none) infinite;
 }
 @keyframes pulse {
   50% {
-    opacity: 0.25;
+    opacity: 0.15;
   }
 }
 .badge.bad {
-  color: var(--rose);
+  color: var(--bad);
 }
 .badge.info {
-  color: var(--lilac);
+  color: var(--ink);
 }
 .badge.plain {
-  color: var(--bone-dim);
+  color: var(--ink-faint);
 }
 
 .note {
   border-radius: var(--radius-sm);
   padding: 12px 14px;
-  border: 1px solid var(--hairline);
-  border-left: 3px solid var(--line);
-  background: color-mix(in srgb, var(--indigo-3) 60%, transparent);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--ink-faint);
+  background: var(--surface);
 }
 .note.good {
-  border-color: color-mix(in srgb, var(--lime) 30%, transparent);
-  border-left-color: var(--lime);
-  background: color-mix(in srgb, var(--lime) 9%, transparent);
-  color: var(--lime);
+  border-color: color-mix(in srgb, var(--ok) 25%, transparent);
+  border-left-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 6%, var(--black));
+  color: var(--ok);
 }
 .note.bad {
-  border-color: color-mix(in srgb, var(--rose) 30%, transparent);
-  border-left-color: var(--rose);
-  background: color-mix(in srgb, var(--rose) 9%, transparent);
-  color: var(--rose);
+  border-color: color-mix(in srgb, var(--bad) 25%, transparent);
+  border-left-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 6%, var(--black));
+  color: var(--bad);
 }
 .note.warn {
-  border-color: color-mix(in srgb, var(--amber) 30%, transparent);
-  border-left-color: var(--amber);
-  background: color-mix(in srgb, var(--amber) 9%, transparent);
-  color: var(--amber);
+  border-color: color-mix(in srgb, var(--warn) 25%, transparent);
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 6%, var(--black));
+  color: var(--warn);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 th {
   text-align: left;
-  font-size: 0.68rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--bone-dim);
-  font-weight: 600;
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--hairline);
-  background: color-mix(in srgb, var(--indigo-0) 45%, transparent);
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+  font-weight: 500;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule-strong);
+  background: var(--black);
   white-space: nowrap;
 }
 td {
   padding: 13px 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent);
+  border-bottom: 1px solid var(--rule);
   vertical-align: top;
   transition: background 0.15s var(--ease);
 }
@@ -674,13 +752,16 @@ tr:last-child td {
   border-bottom: 0;
 }
 tbody tr:hover td {
-  background: color-mix(in srgb, var(--indigo-3) 35%, transparent);
+  background: color-mix(in srgb, var(--raised) 70%, transparent);
 }
 tr.click {
   cursor: pointer;
 }
 tr.click:hover td {
-  background: color-mix(in srgb, var(--indigo-3) 75%, transparent);
+  background: var(--raised);
+}
+tr.click:hover td:first-child {
+  box-shadow: inset 2px 0 0 var(--gold);
 }
 td.num,
 th.num {
@@ -702,94 +783,97 @@ th.num {
   background: none;
 }
 .empty {
-  padding: 40px 28px;
+  padding: 44px 28px;
   text-align: center;
-  color: var(--bone-dim);
+  color: var(--ink-dim);
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.35rem;
 }
 
 .bar {
-  height: 12px;
-  border-radius: 999px;
-  background: var(--indigo-0);
+  height: 10px;
+  border-radius: 99px;
+  background: var(--well);
   overflow: hidden;
-  border: 1px solid var(--hairline);
+  border: 1px solid var(--rule-strong);
 }
 .bar > div {
   height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--lilac), var(--lime));
-  box-shadow: 0 0 16px color-mix(in srgb, var(--lime) 55%, transparent);
+  background: var(--gilt);
   transition: width 0.5s var(--ease);
 }
 .timeline {
   list-style: none;
   margin: 0;
-  padding: 0 0 0 5px;
+  padding: 0 0 0 4px;
 }
 .timeline li {
   padding: 7px 0 7px 20px;
-  border-left: 2px solid var(--hairline);
+  border-left: 1px solid var(--rule-strong);
   position: relative;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 .timeline li::before {
   content: '';
   position: absolute;
-  left: -6px;
-  top: 14px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--indigo-2);
-  border: 2px solid var(--lilac);
+  left: -4px;
+  top: 15px;
+  width: 7px;
+  height: 7px;
+  background: var(--black);
+  border: 1px solid var(--ink-dim);
 }
 .timeline li:last-child::before {
-  background: var(--lilac);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--lilac) 22%, transparent);
+  background: var(--gold);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 20%, transparent);
 }
-/* A segmented control: one track, the chosen option raised inside it. */
+/* A segmented control: one track, the chosen option lit inside it. */
 .tabs {
   display: inline-flex;
-  gap: 4px;
-  padding: 4px;
+  gap: 2px;
+  padding: 3px;
   margin-bottom: 18px;
-  border-radius: 14px;
-  background: var(--indigo-0);
-  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--black);
+  border: 1px solid var(--rule-strong);
 }
 .tabs button {
   border-color: transparent;
   background: transparent;
-  color: var(--bone-dim);
-  border-radius: 10px;
+  color: var(--ink-dim);
+  border-radius: 3px;
 }
 .tabs button:hover:not(:disabled) {
   border-color: transparent;
-  color: var(--bone);
-  transform: none;
+  color: var(--ink);
 }
-.tabs button.on {
-  background: var(--lilac);
-  color: var(--indigo);
+.tabs button.on,
+.tabs button.on:hover:not(:disabled) {
+  background: var(--gilt);
+  color: var(--black);
 }
 
 /* A payment result card picks up the colour of its outcome. */
 .card.outcome-good {
-  border-color: color-mix(in srgb, var(--lime) 40%, var(--line));
-  box-shadow: var(--card-shadow), 0 0 60px -30px var(--lime);
+  border-color: color-mix(in srgb, var(--ok) 45%, var(--rule));
+  box-shadow: inset 0 2px 0 var(--ok);
 }
 .card.outcome-bad {
-  border-color: color-mix(in srgb, var(--rose) 40%, var(--line));
+  border-color: color-mix(in srgb, var(--bad) 45%, var(--rule));
+  box-shadow: inset 0 2px 0 var(--bad);
 }
 .card.outcome-warn {
-  border-color: color-mix(in srgb, var(--amber) 40%, var(--line));
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--rule));
+  box-shadow: inset 0 2px 0 var(--warn);
 }
 
 /* ---- sign in ------------------------------------------------------------- */
 .auth {
   min-height: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
 }
 .auth .pitch {
   position: relative;
@@ -798,46 +882,68 @@ th.num {
   flex-direction: column;
   justify-content: space-between;
   gap: 40px;
-  padding: 44px 52px;
-  border-right: 1px solid var(--hairline);
+  padding: 44px 56px;
+  border-right: 1px solid var(--rule);
   background:
-    radial-gradient(640px 420px at 12% 8%, color-mix(in srgb, var(--coral) 30%, transparent), transparent 70%),
-    radial-gradient(620px 520px at 95% 100%, color-mix(in srgb, var(--lilac) 26%, transparent), transparent 70%),
-    var(--indigo-2);
+    radial-gradient(700px 480px at 0% 0%, color-mix(in srgb, var(--gold) 14%, transparent), transparent 70%),
+    var(--black);
+}
+/* A huge outlined naira sign, set in the serif, bleeding off the corner. */
+.auth .pitch::after {
+  content: '₦';
+  position: absolute;
+  right: -0.12em;
+  bottom: -0.28em;
+  font-family: var(--serif);
+  font-size: 34rem;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1px color-mix(in srgb, var(--gold) 28%, transparent);
+  pointer-events: none;
+}
+.auth .pitch > * {
+  position: relative;
+  z-index: 1;
 }
 .auth .pitch .brand {
   padding: 0;
 }
 .auth .pitch h2 {
-  font-size: clamp(2rem, 1.2rem + 2.6vw, 3.3rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1.02;
-  max-width: 12em;
-  margin: 0 0 28px;
+  font-size: clamp(3.1rem, 1.6rem + 4.4vw, 5.6rem);
+  letter-spacing: -0.015em;
+  line-height: 0.95;
+  max-width: 9.5em;
+  margin: 0 0 34px;
 }
 .auth .pitch h2 em {
-  font-style: normal;
-  color: var(--coral);
+  font-style: italic;
 }
 .promises {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 12px;
-  max-width: 30em;
+  max-width: 32em;
+  border-top: 1px solid var(--rule);
 }
 .promises li {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: flex-start;
-  color: var(--bone-dim);
+  padding: 11px 0;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-dim);
 }
 .promises li svg {
   flex: none;
   margin-top: 3px;
-  color: var(--lime);
+  color: var(--gold);
+}
+.auth .pitch > .dim {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
 }
 .auth .door {
   display: grid;
@@ -847,14 +953,31 @@ th.num {
 .auth .card {
   width: 100%;
   max-width: 420px;
-  padding: 34px;
+  padding: 36px;
+  border-color: var(--rule-strong);
   animation: rise 0.45s var(--ease) both;
 }
 .auth .card h1 {
-  font-size: 1.9rem;
+  font-size: 3rem;
 }
 .auth .card .brand {
   display: none; /* shown only when the pitch panel is hidden (small screens) */
+}
+
+/* Small caps labels: set in the body face, widely spaced, like engraving
+   on a card. Monospace is kept for figures only. */
+.stat .label,
+.eyebrow,
+th,
+.side .section,
+.vault .tag,
+.auth .pitch > .dim {
+  font-family: var(--body);
+  font-weight: 600;
+  letter-spacing: 0.2em;
+}
+th {
+  color: color-mix(in srgb, var(--gold) 70%, var(--ink-faint));
 }
 
 @media (max-width: 860px) {
@@ -868,28 +991,31 @@ th.num {
     flex-wrap: wrap;
     align-items: center;
     border-right: 0;
-    border-bottom: 1px solid var(--hairline);
-    padding: 14px;
+    border-bottom: 1px solid var(--rule);
+    padding: 14px 6px;
   }
   .brand {
-    padding: 0 10px 0 4px;
+    padding: 0 10px 0 10px;
     width: 100%;
     margin-bottom: 8px;
   }
+  .side a.nav {
+    margin: 0 2px;
+  }
   .side .section {
     width: 100%;
-    margin: 10px 8px 2px;
+    margin: 10px 10px 2px;
   }
   .side a.nav.active::before {
     display: none;
   }
   .side .who {
-    margin: 10px 0 0;
+    margin: 10px 10px 0;
     width: 100%;
     padding: 12px 6px 0;
   }
   .main {
-    padding: 24px 16px 56px;
+    padding: 26px 16px 56px;
   }
   .cols-2,
   .cols-3,
@@ -900,7 +1026,7 @@ th.num {
     overflow-x: auto;
   }
   .card.hero {
-    padding: 22px;
+    padding: 22px 22px 26px 44px;
   }
   .auth {
     grid-template-columns: 1fr;

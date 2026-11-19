@@ -31,7 +31,7 @@ export default function Dashboard() {
           label="Success rate"
           value={percent(m.success_rate)}
           hint={`${m.payments.completed} completed · ${m.payments.failed} failed`}
-          tone={m.success_rate === null ? undefined : m.success_rate >= 0.9 ? 'lime' : 'amber'}
+          tone={m.success_rate === null ? undefined : m.success_rate >= 0.9 ? 'ok' : 'warn'}
         />
         <Stat label="p99 latency" value={ms(m.latency_ms.p99)} hint={`p50 ${ms(m.latency_ms.p50)} · ${m.latency_ms.samples} requests`} />
         <Stat label="Volume" value={m.volume.completed_display} hint={`${m.volume.completed_count} completed payments`} />
@@ -39,7 +39,7 @@ export default function Dashboard() {
           label="Unresolved"
           value={m.payments.unresolved}
           hint="Pending or unknown, being confirmed"
-          tone={m.payments.unresolved ? 'amber' : undefined}
+          tone={m.payments.unresolved ? 'warn' : undefined}
         />
       </div>
 
@@ -78,7 +78,7 @@ export default function Dashboard() {
       <div className="grid cols-3">
         <div className="card stat">
           <div className="label">Critical path (our side) p99</div>
-          <div className="value" style={{ color: cp.within_target === false ? 'var(--amber)' : 'var(--lime)' }}>{ms(cp.p99_ms)}</div>
+          <div className="value" style={{ color: cp.within_target === false ? 'var(--warn)' : 'var(--ok)' }}>{ms(cp.p99_ms)}</div>
           <div className="dim small">Target under {cp.target_ms} ms, excluding the bank's own time</div>
         </div>
         <div className="card stat">
@@ -90,7 +90,7 @@ export default function Dashboard() {
         </div>
         <div className="card stat">
           <div className="label">Outbox backlog</div>
-          <div className="value" style={{ color: m.outbox.unpublished > 100 ? 'var(--amber)' : undefined }}>{m.outbox.unpublished}</div>
+          <div className="value" style={{ color: m.outbox.unpublished > 100 ? 'var(--warn)' : undefined }}>{m.outbox.unpublished}</div>
           <div className="dim small">
             {m.outbox.unpublished ? `Oldest waiting ${Math.round(m.outbox.oldest_unpublished_seconds)} s (is the worker running?)` : 'Every event published'}
           </div>

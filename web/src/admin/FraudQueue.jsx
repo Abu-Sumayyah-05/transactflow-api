@@ -34,14 +34,14 @@ function Flag({ item, onDone }) {
         </div>
         <div style={{ textAlign: 'right' }}>
           <div className="dim small">Score</div>
-          <div className="amount" style={{ fontSize: '1.8rem', color: item.score >= 80 ? 'var(--rose)' : 'var(--amber)' }}>{item.score}</div>
+          <div className="amount" style={{ fontSize: '1.8rem', color: item.score >= 80 ? 'var(--bad)' : 'var(--warn)' }}>{item.score}</div>
         </div>
       </div>
       <table>
         <tbody>
           {item.rules_fired.map((r) => (
             <tr key={r.rule}>
-              <td className="mono" style={{ width: 70, color: r.points > 0 ? 'var(--rose)' : 'var(--lime)' }}>
+              <td className="mono" style={{ width: 70, color: r.points > 0 ? 'var(--bad)' : 'var(--ok)' }}>
                 {r.points > 0 ? `+${r.points}` : r.points}
               </td>
               <td>{r.rule.replace(/_/g, ' ')}</td>

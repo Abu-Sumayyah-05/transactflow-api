@@ -27,8 +27,8 @@ async function say(page, text, ms = 3500) {
       const root = host.attachShadow({ mode: 'closed' });
       const box = document.createElement('div');
       box.style.cssText =
-        'max-width:960px;margin:0 24px;background:rgba(12,10,20,.94);color:#fff;font:600 19px/1.45 system-ui,sans-serif;' +
-        'padding:13px 22px;border-radius:14px;border:2px solid #f5b942;box-shadow:0 10px 36px rgba(0,0,0,.6);text-align:center';
+        'max-width:960px;margin:0 24px;background:rgba(7,6,5,.95);color:#f4ecdb;font:500 19px/1.45 Manrope,system-ui,sans-serif;' +
+        'padding:13px 24px;border-radius:10px;border:1px solid #9a7433;box-shadow:0 0 0 1px rgba(216,179,106,.15);box-shadow:0 10px 36px rgba(0,0,0,.7);text-align:center';
       root.appendChild(box);
       host.box = box;
       document.body.appendChild(host);

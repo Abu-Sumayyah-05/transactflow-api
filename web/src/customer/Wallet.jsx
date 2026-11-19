@@ -53,7 +53,7 @@ export default function Wallet() {
                   <td className="dim">{when(r.created_at)}</td>
                   <td>{r.memo || 'Ledger entry'}</td>
                   {/* A wallet is money we owe the customer: a CREDIT raises it. */}
-                  <td className="num amount" style={{ color: r.direction === 'CREDIT' ? 'var(--lime)' : 'var(--bone)' }}>
+                  <td className="num amount" style={{ color: r.direction === 'CREDIT' ? 'var(--ok)' : 'var(--ink)' }}>
                     {r.direction === 'CREDIT' ? '+' : '−'}
                     {naira(r.amount_kobo)}
                   </td>

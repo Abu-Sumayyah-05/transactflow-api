@@ -90,9 +90,9 @@ function Run({ id }) {
 
       {run.status === 'COMPLETED' && (
         <div className="grid cols-4">
-          <Stat label="Matched" value={c.MATCHED} tone="lime" />
-          <Stat label="Pending settlement" value={c.PENDING_SETTLEMENT} tone={c.PENDING_SETTLEMENT ? 'amber' : undefined} hint="Timing, not a break" />
-          <Stat label="Breaks" value={breaks} tone={breaks ? 'rose' : undefined} hint={BREAKS.filter((k) => c[k]).map((k) => `${c[k]} ${k.toLowerCase().replace(/_/g, ' ')}`).join(' · ')} />
+          <Stat label="Matched" value={c.MATCHED} tone="ok" />
+          <Stat label="Pending settlement" value={c.PENDING_SETTLEMENT} tone={c.PENDING_SETTLEMENT ? 'warn' : undefined} hint="Timing, not a break" />
+          <Stat label="Breaks" value={breaks} tone={breaks ? 'bad' : undefined} hint={BREAKS.filter((k) => c[k]).map((k) => `${c[k]} ${k.toLowerCase().replace(/_/g, ' ')}`).join(' · ')} />
           <Stat label="Statement" value={naira(run.closing_kobo)} hint={`${run.statement_ref} · opened ${naira(run.opening_kobo)} · ${run.entries_count} entries`} />
         </div>
       )}

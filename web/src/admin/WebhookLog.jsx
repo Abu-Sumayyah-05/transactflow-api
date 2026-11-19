@@ -33,7 +33,7 @@ export default function WebhookLog() {
                   <td>
                     {e.event_type || '—'}
                     <div className="dim small mono">{e.event_id || 'no event id'}</div>
-                    {e.last_error && <div className="small" style={{ color: 'var(--rose)' }}>{e.last_error}</div>}
+                    {e.last_error && <div className="small" style={{ color: 'var(--bad)' }}>{e.last_error}</div>}
                   </td>
                   <td>{e.signature_valid ? <Badge tone="good">valid</Badge> : <Badge tone="bad">invalid</Badge>}</td>
                   <td>
